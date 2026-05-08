@@ -48,8 +48,15 @@ class DashboardKPIs(BaseModel):
     highRiskCount: int
     """Contratos com risk_score >= 70."""
 
+class ExpirationTimelineItem(BaseModel):
+    """Quantidade de contratos vencendo por mês."""
+
+    mes: str
+    quantidade: int
+
 
 class DashboardStatsResponse(BaseModel):
     """Payload completo retornado por GET /api/v1/dashboard/stats."""
 
     kpis: DashboardKPIs
+    expirationTimeline: list[ExpirationTimelineItem] = []

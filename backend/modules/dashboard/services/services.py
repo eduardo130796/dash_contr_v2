@@ -61,11 +61,16 @@ class DashboardService:
         average_risk_sum = 0
         high_risk_count = 0
         risk_count = 0
+        expiration_timeline = {}
 
         for row in rows:
             is_active = row.is_active
             raw = row.raw_contract or {}
             analysis = row.analysis or {}
+            tipo_documento = (raw.get("tipo") or "").lower()
+
+            if tipo_documento != "contrato":
+                continue
 
             # ── Vigência ──────────────────────────────────────────────────────
             vigencia_fim = self._parse_date(raw.get("vigencia_fim"))
@@ -84,6 +89,11 @@ class DashboardService:
             # ── Vencimento em N dias ──────────────────────────────────────────
             if vigencia_fim and vigencia_fim >= today:
                 days_remaining = (vigencia_fim - today).days
+                month_key = vigencia_fim.strftime("%m/%Y")
+
+                expiration_timeline[month_key] = (
+                    expiration_timeline.get(month_key, 0) + 1
+                )
                 if days_remaining <= 30:
                     expiring30 += 1
                 if days_remaining <= 60:
@@ -141,6 +151,17 @@ class DashboardService:
         # Quando implementado, substituir por: await self._count_alerts()
         active_alerts, red_alerts = await self._count_alerts()
 
+        timeline_sorted = [
+            {
+                "mes": mes,
+                "quantidade": quantidade
+            }
+            for mes, quantidade in sorted(
+                expiration_timeline.items(),
+                key=lambda x: datetime.strptime(x[0], "%m/%Y")
+            )
+        ]
+
         kpis = DashboardKPIs(
             totalActive=total_active,
             expiring30=expiring30,
@@ -165,7 +186,7 @@ class DashboardService:
             totalValue=kpis.totalValue,
         )
 
-        return DashboardStatsResponse(kpis=kpis)
+        return DashboardStatsResponse(kpis=kpis, expirationTimeline=timeline_sorted)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Helpers privados
