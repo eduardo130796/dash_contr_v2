@@ -6,6 +6,7 @@ from backend.core.exceptions.exceptions import global_exception_handler, busines
 from backend.modules.sincronizacao.jobs.jobs import setup_jobs
 from backend.modules.contratos.routes.routes import router as contratos_router
 from backend.modules.sincronizacao.routes.routes import router as sincronizacao_router
+from backend.modules.dashboard.routes.routes import router as dashboard_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,6 +34,7 @@ app.add_exception_handler(BusinessException, business_exception_handler)
 # Rotas
 app.include_router(contratos_router, prefix="/api/v1")
 app.include_router(sincronizacao_router, prefix="/api/v1")
+app.include_router(dashboard_router, prefix="/api/v1")
 
 @app.get("/health", tags=["system"])
 async def health_check():

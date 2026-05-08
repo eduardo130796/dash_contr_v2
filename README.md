@@ -1,73 +1,54 @@
-# Plataforma de Gestão Contratual - Backend
+# Plataforma de Inteligência em Contratos
 
-Núcleo backend oficial da Plataforma de Gestão Contratual, desenvolvido com foco em alta escalabilidade, separação estrita de responsabilidades operacionais e extração assíncrona resiliente.
+Plataforma premium para gestão, monitoramento e análise preditiva de contratos baseada em FastAPI e React.
 
-O sistema atua como o **Source of Truth** (fonte da verdade) de arquitetura escalável da aplicação, enriquecendo dados a partir da API pública governamental. Ele persiste grandes blocos originais em `JSONB` no PostgreSQL (Supabase) para a futura *Engine Analítica* extrair inteligência, sem acoplamento entre a fase de importação e a fase de cálculo.
+## Estrutura do Projeto
 
-## Tecnologias e Stack
+### Backend (FastAPI)
+Localizado em `/backend`, segue uma arquitetura modular orientada a domínios:
 
-- **Linguagem:** Python 3.12
-- **Framework Web:** FastAPI
-- **Banco de Dados:** PostgreSQL (hospedado no Supabase)
-- **ORM e Migrations:** SQLAlchemy 2.0 (Assíncrono via `psycopg`) + Alembic
-- **Jobs & Cron:** APScheduler (Orquestrador Inteligente)
-- **Validação de Dados:** Pydantic v2
-- **Cliente HTTP:** HTTPX (Assíncrono)
-- **Logs:** Structlog (JSON Output)
-- **Infraestrutura:** Docker e Docker Compose
+- `backend/core/`: Infraestrutura transversal (DB, Segurança, Logging).
+- `backend/modules/dashboard/`: KPIs e estatísticas executivas (Executive Cockpit).
+- `backend/modules/contratos/`: Camada operacional (listagem paginada, filtros, busca no backend).
+- `backend/modules/sincronizacao/`: Engine de ingestão e normalização de dados.
+- `backend/modules/alertas/`: Motor de análise e geração de notificações (próxima fase).
 
-## Estrutura de Diretórios e Módulos
+### Frontend (React + Vite)
+Localizado em `/frontend`, utiliza uma arquitetura baseada em componentes e hooks:
 
-A arquitetura do backend é baseada em módulos autônomos e desacoplados.
+- `frontend/src/pages/`: Telas principais (Cockpit, Operações, 360).
+- `frontend/src/components/`: Componentes reutilizáveis e UI (shadcn/ui).
+- `frontend/src/lib/`: Contextos, Utilitários e Camada de Dados.
 
-```
-backend/
-├── app/                  # (Opcional - lógicas genéricas se aplicável)
-├── core/                 # Configurações transversais do sistema
-│   ├── config/           # Variáveis de ambiente e regras dinâmicas (ex: Rate Limit)
-│   ├── database/         # Engine Async e SessionMaker
-│   ├── logging/          # Structlog configurado para JSON em produção
-│   ├── responses/        # Padronização restrita de respostas JSON API
-│   └── exceptions/       # Manipuladores de exceção e padronização de erro
-├── modules/              # Domínios centrais isolados
-│   ├── alertas/          # Lifecycle, status e severidade de avisos e inconsistências
-│   ├── auditoria/        # Rastreabilidade de ações (alert_history)
-│   ├── contratos/        # Núcleo da persistência de payloads JSONB, hashes e stauts
-│   ├── notificacoes/     # Integração multicanal futura (WhatsApp/Email)
-│   └── sincronizacao/    # Httpx, Rate Limits, Checkpoints, Paginação e Orquestração
-└── migrations/           # Versionamento de base de dados e schemas via Alembic
-```
+## Setup Inicial
 
-## Setup e Execução Local
-
-**1. Ambiente Virtual e Deps:**
-Certifique-se de configurar o arquivo `.env` com todas as senhas, URLs da API governamental e a nova chave estrutural `SYNC_RATE_LIMIT=1.0`.
-
-**2. Executar via Docker (Obrigatório em Prod):**
+### 1. Backend
 ```bash
-docker-compose up --build -d
-```
-A API exposta (`http://localhost:8000/docs`) trará os painéis de endpoint para Sincronização Sob Demanda e demais módulos.
+# Criar ambiente virtual
+python -m venv venv
+source venv/bin/activate  # ou venv\Scripts\activate no Windows
 
-**3. Migrations (Alembic):**
-As modificações na base estruturada devem **sempre** ser feitas via migrations:
+# Instalar dependências
+pip install -r backend/requirements.txt
+
+# Rodar servidor
+uvicorn backend.main:app --reload --port 8000
+```
+
+### 2. Frontend
 ```bash
-alembic revision --autogenerate -m "Sua alteracao"
-alembic upgrade head
+cd frontend
+npm install
+npm run dev
 ```
 
-## Padrões Arquiteturais Obrigatórios
+### 3. Docker (Full Stack)
+```bash
+docker-compose up --build
+```
 
-1. **Separação entre Sincronização e Análise:** É expressamente proibido calcular inconsistências ou alertas na camada de fetch de dados (`SincronizacaoService`). A Sincronização serve exclusivamente para espelhar dados, paginar lotes com robustez, manter `locks` de concorrência e evitar queda do sistema. A Análise é feita *a posteriori* em outra Engine.
-2. **JSONB para Payloads:** Dados como empenhos e faturas devem ser lidos como vieram. O sistema NÃO sobrescreve a coluna JSONB local com NULO/Vazio se o respectivo endpoint da API do Comprasnet cair. Ele mantém o dado velho como fallback e adiciona a flag `failed` na coluna de rastreio de status (ex: `empenhos_status`).
-3. **Checkpoints e Retries Contínuos:** Sincronizações grandes (Bootstrap) paginam arrays em lotes de memória, gravando o estado na tabela `sync_executions`. Quedas retornam a varredura do ponto em que parou sem onerar a rede ou a memória.
+## Diretrizes de Desenvolvimento
 
-## Documentação Viva (Core Architecture)
-
-Consulte a pasta `docs/` para se aprofundar na "Bíblia" do comportamento operacional. Ignorar esses arquivos na evolução futura da aplicação causará a quebra dos pilares do sistema:
-- `docs/REGRAS_NEGOCIO.md`
-- `docs/SINCRONIZACAO.md`
-- `docs/ENDPOINTS.md`
-- `docs/FLUXOS.md`
-- `docs/ANALISES_FUTURAS.md`
-- `docs/ALERTAS.md`
+1. **SSOT (Single Source of Truth):** Toda a lógica de negócio e cálculos de KPIs devem residir no Backend.
+2. **Arquitetura Limpa:** Módulos devem ser independentes e seguir o padrão Router -> Service -> Repository.
+3. **UX Integrada:** O frontend deve ser uma camada fina de interface, delegando filtros e paginação complexa para a API.

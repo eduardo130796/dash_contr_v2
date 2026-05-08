@@ -1,40 +1,47 @@
-# Arquitetura do Sistema
+# Arquitetura Contract360
 
-Documento que define os padrões arquiteturais obrigatórios para a Plataforma de Gestão Contratual.
+Plataforma integrada de gestão e análise de contratos públicos, baseada em micro-módulos e processamento analítico assíncrono.
 
-A plataforma foca na importação robusta, tratamento escalável e geração estruturada de inteligência sobre contratos e seus domínios (empenhos, faturas, responsáveis, itens, etc) extraídos da API Comprasnet.
+## 1. Princípios Arquiteturais
 
-## 1. Topologia de Banco de Dados (PostgreSQL + Supabase)
+1.  **Backend como SSOT:** Toda a lógica de negócio, cálculos financeiros, scoring de risco e consolidação de status residem no backend.
+2.  **Frontend Pure Renderer:** O frontend React é uma camada de apresentação burra que consome payloads analíticos pré-processados.
+3.  **Domínio Unificado:** Nomenclatura em português para o domínio de negócio, alinhada entre as tabelas do PostgreSQL, modelos Pydantic e propriedades do Frontend.
+4.  **Resiliência Baseada em Hash:** A sincronização utiliza hashes (`SHA-256`) para identificar mudanças e evitar processamento redundante.
 
-Diferente de sistemas legados que espelham perfeitamente árvores complexas de endpoints REST em um schema relacional monstruoso, nós adotamos a abordagem do **Dado Cru Garantido (JSONB)**:
-* Colunas normais servem apenas para: Índices vitais (`external_id`), rastreadores de estado (`status`, `is_active`, `empenhos_status`) e assinaturas temporais.
-* Os dados brutos das faturas, itens e empenhos habitam inteiramente e imutavelmente suas próprias colunas `JSONB` no model Contratos.
+## 2. Stack Tecnológica
 
-Se a API do governo adicionar um campo novo no array de faturas amanhã, nosso sistema não precisará rodar uma migration complexa para começar a salvar; o pacote JSONB ingere passivamente.
+-   **Backend:** FastAPI, SQLAlchemy (Async), PostgreSQL.
+-   **Frontend:** React, Vite, Tailwind CSS, Shadcn/UI, React Query.
+-   **Infra:** Docker, Docker Compose.
 
-## 2. Princípios Imutáveis de Código
+## 3. Estrutura de Domínio e Situação Real
 
-* **Router Burro:** O controlador de HTTP não processa negócios. Todo o crivo é do `Service`.
-* **Proteção Mútua de Concorrência:** Sincronizações assíncronas geram conflitos no banco se disparadas freneticamente no mesmo registro. Todo evento que busca atualizar um registro ativamente sob demanda usa travas de `asyncio.Lock` em memória por ID do contrato.
-* **Blindagem de Falhas (Obrigatório):** Erro de Timeout com o Comprasnet não é novidade, é regra. Se uma API de enriquecimento falhar ao entregar um JSON novo, o sistema **proíbe a substituição** do JSON velho. Ele atualiza apenas o tracker de saúde (ex: `faturas_status = 'failed'`). Isso não estilhaça nenhum dashboard.
+A `situacao_real` é o campo mestre que define o estado do contrato na plataforma:
+-   **Ativo:** Vigência futura e status operacional.
+-   **Vencendo:** Vigência expira em menos de 30 dias.
+-   **Vencido:** Data de vigência ultrapassada.
+-   **Suspenso:** Interrupção temporária documentada.
+-   **Encerrado:** Ciclo de vida concluído.
 
-## 3. Arquitetura da Sincronização
+## 4. Fluxo de Dados (SSOT Flow)
 
-A sincronização se divide arquiteturalmente em duas mentes operacionais:
-1. **O Orquestrador (Scheduler)**
-   * Trabalha sobre a tabela `sync_executions`.
-   * Realiza `Bootstrap` (cobertura incansável e bruta a cada 2 horas) salvando Checkpoints lógicos até cravar que todo o array inicial da UG (Unidade Gestora) desceu corretamente.
-   * Realiza `Incremental` (cobertura elegante diária) apenas analisando contratos marcados como "ativos".
-2. **O Roteador On-Demand**
-   * Usado para botões de "Forçar Atualização" no painel visual. Funciona com exata paridade à lógica do Orquestrador, aproveitando os cálculos de hash, porém voltado a apenas um contrato sem interferir nos *checkpoints*.
+1.  **Sincronização:** Coleta dados brutos (PNCP/Comprasnet) e armazena em JSONB.
+2.  **Análise (Background):** Processa os JSONBs, calcula riscos, derivas status e gera flags.
+3.  **Analytics (360):** `ContratoService` compõe a visão consolidada para o Contract 360.
+4.  **Apresentação:** Frontend aplica formatadores (`formatters.js`) e renderiza os componentes.
 
-## 4. O Rate Limit Nativo
+## 5. Padronização de Exibição (Localização BR)
 
-Não podemos sobrecarregar a infraestrutura alheia. Todas as sequências de consumo massivo de endpoits (quando se itera pelos 6 secundários de um contrato) contêm delays programáticos via `asyncio.sleep()`, importado dinamicamente via `.env` (`SYNC_RATE_LIMIT`), propiciando "friendly consumption".
+| Elemento | Padrão |
+| :--- | :--- |
+| **Datas** | `DD/MM/YYYY` (ex: 08/05/2024) |
+| **Valores** | `R$ 1.234,56` |
+| **Identificadores** | Formato original do contrato (ex: 123/2024) |
+| **Labels** | Capitalização amigável (ex: Ativo, Vencendo) |
 
-## 5. Próxima Fronteira: Motor de Análise
-É formalmente proibido acoplar regras de alertas no módulo Sincronizador. A importação de dados e a análise destes não se tocam diretamente.
-* O motor de Análise (A ser desenvolvido) roda de forma cega em cima da massa SQL local que o Sincronizador consolidou (os dados no JSONB).
-* Os Alertas gerados são gravados de forma perene no PostgreSQL (`active`, `resolved`), e não computados em tempo real na tela do frontend. O frontend será burro e apenas lerá `SELECT * FROM alertas`.
+## 6. Governança de Documentação
 
-Qualquer refatoração deve obedecer a estas 5 diretrizes, sob pena de perda drástica de performance ou regressão analítica.
+-   `docs/CONTRACT360_ARCHITECTURE.md`: Detalhes técnicos da visão 360.
+-   `docs/frontend/FRONTEND_ENDPOINT_MAPPING.md`: Mapa de integração API/UI.
+-   `docs/REGRAS_NEGOCIO.md`: Lógica de negócio e cálculos aplicados.
