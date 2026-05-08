@@ -47,38 +47,34 @@ export function getCriticalityConfig(criticality) {
   return configs[criticality] || configs.low;
 }
 
-function normalizeStatus(status) {
-  if (status === "ativo_com_execucao_no_ano") {
-    return "ativo_operacional";
-  }
 
-  if (status === "vencido_com_execucao_no_ano") {
-    return "vencido_com_execucao_recente";
-  }
-
-  return status;
-}
 
 export function getStatusConfig(status) {
-  const normalized = normalizeStatus(status);
+  const normalized = status?.toLowerCase?.() || '';
 
   const configs = {
-    ativo_operacional: {
+    ativo: {
       label: 'Ativo',
       color: 'text-emerald-500',
       bg: 'bg-emerald-500/10 border-emerald-500/20'
     },
 
-    ativo_sem_execucao: {
-      label: 'Ativo (sem execução)',
+    vencendo: {
+      label: 'Vencendo',
       color: 'text-amber-400',
       bg: 'bg-amber-400/10 border-amber-400/20'
     },
 
-    vencido_com_execucao_recente: {
-      label: 'Vencido (em execução)',
+    vencido: {
+      label: 'Vencido',
       color: 'text-orange-500',
       bg: 'bg-orange-500/10 border-orange-500/20'
+    },
+
+    suspenso: {
+      label: 'Suspenso',
+      color: 'text-yellow-500',
+      bg: 'bg-yellow-500/10 border-yellow-500/20'
     },
 
     encerrado: {

@@ -50,6 +50,7 @@ async def job_sincronizacao():
 
 def setup_jobs():
     # Roda a cada 2 horas
-    scheduler.add_job(job_sincronizacao, 'cron', hour='0,2,4,6,8,10,12,14,16,18,20,22', minute=0, id='sync_orchestrator')
+    #scheduler.add_job(job_sincronizacao, 'cron', hour='0,2,4,6,8,10,12,14,16,18,20,22', minute=0, id='sync_orchestrator')
+    scheduler.add_job(job_sincronizacao, 'cron', minute='*/2', id='sync_orchestrator')
     scheduler.start()
     log.info("APScheduler iniciado e jobs configurados a cada 2h (Coordenador Inteligente)")

@@ -37,6 +37,7 @@ class ContractListItem(BaseModel):
     contract_number: str
     object: str
     contractor: str
+    start_date: Optional[str] = None
     end_date: Optional[str] = None
     manager: Optional[str] = None
     status: Optional[str] = None
@@ -70,6 +71,7 @@ class ResumoContratoSchema(BaseModel):
     processo: Optional[str] = None
     situacao_real: Optional[str] = None
     is_estrategico: bool = False
+    inicio_vigencia: Optional[str] = None
     vencimento: Optional[str] = None
     dias_restantes: Optional[int] = None
     valor_global: float = 0.0

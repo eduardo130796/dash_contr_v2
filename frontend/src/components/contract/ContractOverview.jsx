@@ -27,10 +27,9 @@ export default function ContractOverview({ resumo, riscos, alertas, aditivosCoun
           <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Detalhes do Contrato</h3>
 
           <div className="space-y-3 text-xs">
+            <Row label="Fornecedor" value={resumo?.fornecedor} />
             <Row label="Categoria" value={resumo?.categoria} />
             <Row label="Unidade" value={resumo?.unidade} />
-            <Row label="Modalidade" value={resumo?.modalidade} />
-            <Row label="Processo" value={resumo?.processo} />
             <Row label="Situação Real" value={getStatusLabel(resumo?.situacao_real)} />
             <Row label="Estratégico" value={resumo?.is_estrategico ? "Sim" : "Não"} />
             <Row label="Aditivos" value={aditivosCount || 0} />

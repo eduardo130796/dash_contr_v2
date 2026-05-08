@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Search, Filter, ArrowUpDown, LayoutList, LayoutGrid, 
-  ChevronRight, ChevronLeft, Download, Loader2 
+  ChevronRight, ChevronLeft, Download, Loader2 ,CalendarDays, Flag
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -185,7 +185,7 @@ export default function ContractsOperations() {
                     { key: 'contract_number', label: 'Nº Contrato' },
                     { key: 'object', label: 'Objeto' },
                     { key: 'fornecedor', label: 'Fornecedor' },
-                    { key: 'vigencia_fim', label: 'Vencimento' },
+                    { key: 'vigencia', label: 'Vigência', sortDisabled: true },
                     { key: 'days_remaining', label: 'Prazo', sortDisabled: true },
                     { key: 'valor_global', label: 'Valor Global' },
                     { key: 'status', label: 'Situação', sortDisabled: true },
@@ -225,13 +225,41 @@ export default function ContractsOperations() {
                       <td className="px-4 py-3">
                         <span className="font-mono text-xs font-medium text-primary">{c.contract_number}</span>
                       </td>
-                      <td className="px-4 py-3 max-w-[200px]">
+                      <td className="px-4 py-3 max-w-[380px] min-w-[320px]">
                         <span className="text-xs truncate block" title={c.object}>{c.object}</span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{c.contractor}</td>
-                      <td className="px-4 py-3 text-xs tabular-nums text-muted-foreground">
-                        {formatarDataBR(c.end_date)}
+                      <td className="px-4 py-3 max-w-[160px]">
+                        <span
+                          className="text-xs text-muted-foreground truncate block"
+                          title={c.contractor}
+                        >
+                          {c.contractor}
+                        </span>
                       </td>
+                     <td className="px-4 py-3">
+                      <div className="flex flex-col leading-tight">
+                        
+                        <span className="text-[11px] text-muted-foreground">
+                          Início: {formatarDataBR(c.start_date)}
+                        </span>
+
+                        <span
+                          className={cn(
+                            "text-xs font-semibold",
+                            days <= 30
+                              ? "text-red-500"
+                              : days <= 60
+                              ? "text-orange-500"
+                              : days <= 90
+                              ? "text-amber-500"
+                              : "text-foreground"
+                          )}
+                        >
+                          Fim: {formatarDataBR(c.end_date)}
+                        </span>
+
+                      </div>
+                    </td>
                       <td className="px-4 py-3">
                         <span className={cn(
                           "text-xs font-semibold tabular-nums",

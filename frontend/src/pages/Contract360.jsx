@@ -6,7 +6,7 @@ import { StatusBadge, CriticalityBadge } from '@/components/shared/StatusBadge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
-import { ArrowLeft, Building2, Calendar, User, DollarSign, Shield, Loader2 } from 'lucide-react';
+import { ArrowLeft, Building2, Calendar, User, DollarSign, Shield, Loader2,FolderSearch,Scale } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Componentes das Abas
@@ -132,10 +132,10 @@ export default function Contract360() {
 
       {/* ─── SUMMARY CARDS ─── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <InfoCard icon={Building2} label="Fornecedor" value={resumo?.fornecedor || "—"} />
-        <InfoCard icon={User}      label="Gestor"    value={resumo?.gestor || 'Não atribuído'} />
+        <InfoCard icon={FolderSearch} label="Processo" value={resumo?.processo || "—"}/>
         <InfoCard icon={DollarSign} label="Valor Global" value={formatarMoedaBR(resumo?.valor_global)} />
-        <InfoCard icon={Calendar}  label="Vencimento" value={formatarDataBR(resumo?.vencimento)} />
+        <InfoCard icon={Calendar} label="Vigência" value={`${formatarDataBR(resumo?.inicio_vigencia)} → ${formatarDataBR(resumo?.vencimento)}`}/>
+        <InfoCard icon={Scale} label="Modalidade" value={resumo?.modalidade || "—"}/>
         <InfoCard icon={Shield}    label="Risco"      value={`${riscos?.score || 0}/100`} />
         <InfoCard icon={Calendar}  label="Última Sinc" value={formatarDataHoraBR(metadata?.last_sync)} />
       </div>

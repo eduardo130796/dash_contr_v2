@@ -67,15 +67,6 @@ export function DataProvider({ children }) {
         // ── 2. Lista de contratos (para Operations + Contract360) ──────────
         // Ainda consome /api/dashboard até o endpoint /api/v1/contracts
         // paginado estar implementado (próxima fase).
-        const dashRes = await fetch(`/api/dashboard`, {
-          credentials: "include",
-        });
-
-        if (dashRes.ok) {
-          const dashData = await dashRes.json();
-          setContracts(dashData.contracts || []);
-          setAlerts(dashData.alerts     || []);
-        }
         // Se /api/dashboard falhar, mantemos arrays vazios — os KPIs já vieram
         // do endpoint dedicado e o cockpit continuará funcionando.
 

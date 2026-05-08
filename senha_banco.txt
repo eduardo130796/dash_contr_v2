@@ -4,3 +4,5 @@ rodar codespace FASTAPI:
     Na raiz do projeto:
 
     python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+front:
+    npm run dev -- --host 0.0.0.0 --port 5173
