@@ -6,7 +6,13 @@ class DashboardKPIs(BaseModel):
 
     # Volumes de contratos
     totalActive: int
-    """Contratos com status 'ativo' (vigencia_fim >= hoje)."""
+    """Contratos (tipo instrumento = contrato) no portfólio executivo — ver `ativo_rules.is_contrato_executivo_kpi_row`."""
+
+    activeEmpenhos: int = 0
+    """Empenhos / ordens no mesmo critério de portfólio ativo (tipo empenho)."""
+
+    activeAtas: int = 0
+    """Atas no mesmo critério de portfólio ativo (tipo ata)."""
 
     expiring30: int
     """Contratos ativos com vencimento em até 30 dias."""
@@ -22,10 +28,16 @@ class DashboardKPIs(BaseModel):
 
     # Criticidade
     critical: int
-    """Contratos com criticidade 'critical' ou 'urgent'."""
+    """Contratos com criticidade 'critical'."""
 
     urgent: int
-    """Contratos com criticidade 'urgent' (subconjunto de critical)."""
+    """Contratos com criticidade 'urgent'."""
+
+    attention: int
+    """Contratos com criticidade 'attention'."""
+
+    low: int
+    """Contratos com criticidade 'low'."""
 
     strategic: int
     """Contratos marcados como estratégicos."""
@@ -50,13 +62,50 @@ class DashboardKPIs(BaseModel):
 
 class ExpirationTimelineItem(BaseModel):
     """Quantidade de contratos vencendo por mês."""
-
     mes: str
     quantidade: int
 
+class UrgentAction(BaseModel):
+    """Ação urgente baseada em alerta crítico."""
+    id: str | None
+    contract_id: str | None
+    contract_number: str | None
+    contract_object: str | None
+    title: str
+    severity: str
+    priority: str
+    recommended_action: str | None
+    days_remaining: int | None
+
+class ExecutiveInsight(BaseModel):
+    """Insight estratégico gerado pelo backend."""
+    type: str
+    title: str
+    description: str
+    severity: str
+
+class UnitAggregation(BaseModel):
+    """Agregação de contratos por unidade gestora."""
+    unit: str
+    total_contracts: int
+    critical_contracts: int
+    expiring_contracts: int
+
+class ExpirationTimelineDetail(BaseModel):
+    """Item detalhado da linha do tempo de vencimentos."""
+    contract_id: str | None
+    contract_number: str
+    contract_object: str | None
+    days_remaining: int
+    severity: str
+    expiration_date: str
 
 class DashboardStatsResponse(BaseModel):
     """Payload completo retornado por GET /api/v1/dashboard/stats."""
 
     kpis: DashboardKPIs
     expirationTimeline: list[ExpirationTimelineItem] = []
+    urgent_actions: list[UrgentAction] = []
+    executive_insights: list[ExecutiveInsight] = []
+    contracts_by_unit: list[UnitAggregation] = []
+    expiration_timeline: list[ExpirationTimelineDetail] = []

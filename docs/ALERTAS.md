@@ -1,65 +1,71 @@
-# Lifecycle e Documentação de Alertas
+# Lifecycle e Documentação de Alertas v1
 
-O módulo de alertas é construído de forma desacoplada do frontend e opera em "camadas de persistência". Isso significa que os alertas não surgem como um cálculo efêmero no painel visual: eles nascem, duram, e morrem guardados em banco de dados, compondo o histórico da plataforma.
+O módulo de alertas é o componente central de governança da plataforma, operando como uma camada de persistência para todas as inconsistências identificadas pela **Analysis Engine**.
 
-## 1. Motivação da Arquitetura de Alertas Persistentes
+## 1. Arquitetura de Persistência e Idempotência
 
-Calcular em tempo real no dashboard visual dezenas de alertas (varrendo todos os arrays JSON do banco para ver se um empenho está sem nota de saldo) causaria um congelamento e sobrecarga de CPU absurdos.
+Os alertas são persistidos no banco de dados com um `fingerprint` único (SHA256) calculado a partir de:
+`contract_id` + `type` + `context` (metadados normalizados).
 
-**Arquitetura implementada:**
-O módulo `alertas` aguarda que a _Sincronização_ termine de processar. No futuro, um _Motor de Análise_ (Analysis Engine) irá recalcular regras em cima dos `JSONB` enriquecidos, disparando a inserção desses Alertas no banco de dados.
-O frontend irá apenas realizar queries rápidas tipo `SELECT * FROM alertas WHERE status = 'active'`, sem saber como ou por que eles foram gerados, separando totalmente a responsabilidade UI da regra de negócio.
+Isso garante que:
+- O mesmo problema não gere múltiplos alertas.
+- Reincidências sejam rastreadas através dos campos `first_seen_at` e `last_seen_at`.
+- O histórico de alterações seja preservado mesmo após a resolução.
 
-## 2. Estrutura do Model (Lifecycles)
+## 2. Estrutura do Modelo e Governança
 
-A tabela `alertas` foi implementada na pasta `models.py` da seguinte forma:
+Campos principais v1:
+- `fingerprint`: Identificador único de idempotência.
+- `category`: [vigencia, sincronizacao, compliance, cadastro].
+- `severity`: [critical, high, medium, low, info].
+- `priority`: [immediate, high, normal, low].
+- `source`: Origem do alerta (ex: `analysis_engine`).
+- `analyzer_name`: Nome do analisador que gerou o alerta.
+- `recommended_action`: Texto orientador para o gestor.
 
-```python
-class Alerta(Base):
-    id = Column(...)
-    contract_id = Column(ForeignKey(...))
-    type = Column(String)
-    severity = Column(String)
-    title = Column(String)
-    message = Column(String)
-    status = Column(String)  # Status do Lifecycle
-    
-    # Rastreabilidade temporal
-    created_at = Column(...)
-    expires_at = Column(...)
-    dismissed_at = Column(...)
-    resolved_at = Column(...)
-    
-    # Controle de Mensageria Externa
-    last_notification_at = Column(...)
-    notification_count = Column(...)
-    metadata_json = Column(JSONB)
-```
+## 3. Ciclo de Vida (Status)
 
-## 3. Estados dos Alertas (Status)
+Todo alerta transita pelos seguintes estados:
+- `active`: Identificado recentemente e pendente de ação.
+- `viewed`: Visualizado pelo usuário no dashboard.
+- `dismissed`: Ignorado conscientemente (requer justificativa).
+- `resolved`: Resolvido automaticamente pela Engine quando a causa raiz desaparece.
+- `expired`: Prazo de SLA excedido.
+- `failed`: Erro no processamento ou notificação.
 
-Todo alerta transita no sistema com os seguintes `status`:
-* `active`: Gerado pela Engine recentemente, não lido pelo usuário e não resolvido na última Sincronização.
-* `viewed`: Reconhecido pelo usuário na UI (útil para auditoria).
-* `dismissed`: Ignorado conscientemente pelo usuário gestor de contrato (Ação persistida em `alert_history`).
-* `resolved`: A engine de sincronização seguinte rodou, verificou a inconsistência na API do Comprasnet, percebeu que a falha original foi mitigada pela base governamental, e marcou como resolvido. O usuário não teve que limpar manualmente.
-* `expired`: O alerta tinha um prazo temporal máximo para atuação, e o prazo estourou. Útil para SLAs críticos.
-* `failed`: Falhou ao ser classificado ou roteado na notificação.
+## 4. Resolução Automática
 
-## 4. Auditoria
+A Analysis Engine realiza a resolução automática:
+1. Em cada rodada, ela identifica os problemas atuais.
+2. Se um alerta `active` de um contrato NÃO for reportado pelo seu respectivo `analyzer`, ele é marcado como `resolved`.
+3. Isso garante que o dashboard esteja sempre limpo e reflita o estado real da API governamental.
 
-Dada a criticidade do controle contratual:
-Qualquer mudança no Lifecycle de um alerta (ex: um gestor clica no botão "Dispensar Alerta") obriga o preenchimento de um registro espelho na tabela `alert_history`.
+## 5. Auditoria (Alert History)
 
-```python
-class AlertHistory(Base):
-    alert_id = ForeignKey(...)
-    action = Column(String)  # (ex: dismissed, viewed, sent_to_whatsapp)
-    performed_by = Column(String) # (usuário ou 'system')
-    details = Column(JSONB)  # payload que justifica a ação
-```
+Toda mudança de status é registrada automaticamente na tabela `alert_history`, contendo:
+- `alert_id`: Referência ao alerta.
+- `action`: [created, viewed, dismissed, resolved, reactivated].
+- `performed_by`: Usuário ou `system`.
+- `details`: JSON contendo o contexto da mudança.
 
-## 5. Tabela de Notificações
+## 6. Endpoints Disponíveis
 
-Para expansão futura do canal operacional, o módulo de notificações já conta com a base relacional preenchida:
-A `notifications` aguarda um worker que pegue alertas com status `active` marcados como emergenciais para dispará-los via provedores terceiros (`providers`). Contando com campos de `retry_count`, `provider_response` e controle de envio assíncrono.
+- `POST /api/v1/alertas/{id}/dismiss`: Dispensa com justificativa.
+
+## 7. Estratégia de Visualização (Consumo)
+
+A plataforma separa a profundidade operacional da visibilidade estratégica:
+
+### ExecutiveCockpit (Priorização)
+- **Foco:** Sinais de fumaça e picos de risco.
+- **Payload:** Resumido via `/api/v1/dashboard/stats`.
+- **Conteúdo:** Apenas identificação e urgência.
+
+### AlertCenter (Operação)
+- **Foco:** Investigação, auditoria e resolução.
+- **Payload:** Detalhado via `/api/v1/alertas`.
+- **Conteúdo:** Histórico completo, recomendação técnica, fonte e contexto.
+
+### Contract360 (Análise)
+- **Foco:** Visão holística do contrato.
+- **Payload:** Através de `Contrato360Response`.

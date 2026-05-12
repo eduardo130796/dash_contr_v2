@@ -6,6 +6,12 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from backend.core.logging.logger import log
 from backend.modules.contratos.models.models import Contrato
+from backend.modules.contratos.domain.ativo_rules import (
+    counts_in_expiration_views,
+    is_ata_kpi_row,
+    is_contrato_executivo_kpi_row,
+    is_empenho_kpi_row,
+)
 from backend.modules.dashboard.schemas.schemas import DashboardKPIs, DashboardStatsResponse
 
 
@@ -14,7 +20,7 @@ class DashboardService:
     Centraliza todos os cálculos de KPIs do Dashboard Executivo.
 
     Regras de negócio consolidadas aqui (antes dispersas no DataContext.jsx):
-    - Contratos ativos: is_active = True
+    - Contratos ativos (KPI): `ativo_rules.is_contrato_executivo_kpi_row` (SSOT compartilhado com listagem)
     - Vencimento: cast do campo JSONB raw_contract->>'vigencia_fim' como DATE
     - Valor financeiro: raw_contract->>'valor_global' (fallback: valor_inicial)
     - Criticidade: derivada do campo analysis->>'criticality' ou risk_score
@@ -41,6 +47,9 @@ class DashboardService:
                 Contrato.status,
                 Contrato.analysis,
                 Contrato.raw_contract,
+                Contrato.empenhos_status,
+                Contrato.faturas_status,
+                Contrato.historico_status,
             )
         )
         rows = result.all()
@@ -50,12 +59,16 @@ class DashboardService:
         # para extrações de JSONB aninhado com múltiplos fallbacks)
         # ──────────────────────────────────────────────────────────────────────
         total_active = 0
+        active_empenhos = 0
+        active_atas = 0
         expiring30 = 0
         expiring60 = 0
         expiring90 = 0
         expiring180 = 0
         critical = 0
         urgent = 0
+        attention = 0
+        low = 0
         strategic = 0
         total_value = 0.0
         average_risk_sum = 0
@@ -67,27 +80,21 @@ class DashboardService:
             is_active = row.is_active
             raw = row.raw_contract or {}
             analysis = row.analysis or {}
-            tipo_documento = (raw.get("tipo") or "").lower()
+            if is_empenho_kpi_row(is_active, row.status, raw):
+                active_empenhos += 1
+            if is_ata_kpi_row(is_active, row.status, raw):
+                active_atas += 1
 
-            if tipo_documento != "contrato":
+            if not is_contrato_executivo_kpi_row(is_active, row.status, raw):
                 continue
 
-            # ── Vigência ──────────────────────────────────────────────────────
+            # ── Vigência (somente raw_contract.vigencia_fim) ─────────────────
             vigencia_fim = self._parse_date(raw.get("vigencia_fim"))
-
-            # Considera ativo se is_active=True OU status não é 'encerrado'
-            # (o sincronizador marca is_active baseado na vigencia_fim)
-            contrato_ativo = is_active or (
-                row.status not in ("encerrado", "vencido")
-            )
-
-            if not contrato_ativo:
-                continue
 
             total_active += 1
 
-            # ── Vencimento em N dias ──────────────────────────────────────────
-            if vigencia_fim and vigencia_fim >= today:
+            # ── Vencimento em N dias (exclui vigência indeterminada) ───────────
+            if counts_in_expiration_views(row.status, vigencia_fim, today):
                 days_remaining = (vigencia_fim - today).days
                 month_key = vigencia_fim.strftime("%m/%Y")
 
@@ -112,10 +119,14 @@ class DashboardService:
                     analysis.get("risk_score") or raw.get("risk_score")
                 )
             )
-            if criticality in ("critical", "urgent"):
-                critical += 1
             if criticality == "urgent":
                 urgent += 1
+            elif criticality == "critical":
+                critical += 1
+            elif criticality == "attention":
+                attention += 1
+            else:
+                low += 1
 
             # ── Estratégico ────────────────────────────────────────────────────
             is_strategic = (
@@ -164,12 +175,16 @@ class DashboardService:
 
         kpis = DashboardKPIs(
             totalActive=total_active,
+            activeEmpenhos=active_empenhos,
+            activeAtas=active_atas,
             expiring30=expiring30,
             expiring60=expiring60,
             expiring90=expiring90,
             expiring180=expiring180,
             critical=critical,
             urgent=urgent,
+            attention=attention,
+            low=low,
             strategic=strategic,
             totalValue=total_value,
             activeAlerts=active_alerts,
@@ -178,15 +193,197 @@ class DashboardService:
             highRiskCount=high_risk_count,
         )
 
+        # ── Novas Seções Analíticas (Resilientes) ──────────────────────────
+        try:
+            urgent_actions = await self._get_urgent_actions()
+        except Exception:
+            log.exception("Erro ao buscar ações urgentes para o dashboard")
+            urgent_actions = []
+
+        try:
+            executive_insights = self._generate_executive_insights(kpis, rows)
+        except Exception:
+            log.exception("Erro ao gerar insights executivos para o dashboard")
+            executive_insights = []
+
+        try:
+            units_aggregation, expiration_detail = self._process_units_and_timeline(rows, today)
+        except Exception:
+            log.exception("Erro ao processar unidades e timeline para o dashboard")
+            units_aggregation, expiration_detail = [], []
+
         log.info(
             "Stats calculados",
             totalActive=kpis.totalActive,
-            expiring30=kpis.expiring30,
-            critical=kpis.critical,
-            totalValue=kpis.totalValue,
+            activeAlerts=kpis.activeAlerts,
+            insights=len(executive_insights),
         )
 
-        return DashboardStatsResponse(kpis=kpis, expirationTimeline=timeline_sorted)
+        return DashboardStatsResponse(
+            kpis=kpis,
+            expirationTimeline=timeline_sorted,
+            urgent_actions=urgent_actions,
+            executive_insights=executive_insights,
+            contracts_by_unit=units_aggregation,
+            expiration_timeline=expiration_detail
+        )
+
+    async def _get_urgent_actions(self) -> list:
+        """Busca os 6 alertas mais críticos e urgentes para o cockpit."""
+        try:
+            from backend.modules.alertas.models.models import Alerta
+            from sqlalchemy import desc
+
+            # Prioridades que consideramos "urgentes" para o cockpit
+            stmt = (
+                select(Alerta, Contrato.contract_number, Contrato.raw_contract)
+                .join(Contrato, Alerta.contract_id == Contrato.id)
+                .where(Alerta.status == "active")
+                .where(Alerta.priority.in_(["immediate", "high"]))
+                .order_by(
+                    case(
+                        (Alerta.priority == "immediate", 1),
+                        (Alerta.priority == "high", 2),
+                        else_=3
+                    ),
+                    desc(Alerta.created_at)
+                )
+                .limit(6)
+            )
+            result = await self.session.execute(stmt)
+            actions = []
+            for alert, contract_number, raw_contract in result.all():
+                obj = (raw_contract or {}).get("objeto") or "Objeto não informado"
+                actions.append({
+                    "id": alert.id,
+                    "contract_id": alert.contract_id,
+                    "contract_number": contract_number,
+                    "contract_object": obj[:100] + ("..." if len(obj) > 100 else ""),
+                    "title": alert.title,
+                    "severity": alert.severity,
+                    "priority": alert.priority,
+                    "recommended_action": alert.recommended_action,
+                    "days_remaining": None
+                })
+            return actions
+        except Exception as e:
+            log.error(f"Erro ao buscar ações urgentes: {e}")
+            return []
+
+    def _generate_executive_insights(self, kpis: DashboardKPIs, rows: list) -> list:
+        """Gera insights estratégicos baseados nos dados atuais."""
+        insights = []
+
+        # Insight 1: Pico de vencimentos
+        if kpis.expiring90 > 5:
+            insights.append({
+                "type": "renewal_peak",
+                "title": f"Pico de Vencimentos Próximo",
+                "description": f"{kpis.expiring90} contratos vencem em até 90 dias. Inicie o planejamento orçamentário.",
+                "severity": "medium" if kpis.expiring90 < 15 else "high"
+            })
+
+        # Insight 2: Alertas Críticos
+        if kpis.redAlerts > 0:
+            insights.append({
+                "type": "critical_risk",
+                "title": "Atenção: Alertas Críticos Ativos",
+                "description": f"Existem {kpis.redAlerts} alertas de máxima severidade que requerem intervenção imediata.",
+                "severity": "critical"
+            })
+
+        # Insight 3: Falhas de Sincronização
+        sync_failures = sum(
+            1
+            for r in rows
+            if is_contrato_executivo_kpi_row(r.is_active, r.status, r.raw_contract or {})
+            and any(
+                s == "failed"
+                for s in [
+                    r.empenhos_status,
+                    r.faturas_status,
+                    r.historico_status,
+                ]
+            )
+        )
+        if sync_failures > 0:
+            insights.append({
+                "type": "sync_issue",
+                "title": "Inconsistência de Dados (Sync)",
+                "description": f"{sync_failures} contratos com falha na atualização de dados governamentais.",
+                "severity": "low"
+            })
+
+        # Insight Default se não houver problemas
+        if not insights:
+            insights.append({
+                "type": "healthy",
+                "title": "Operação Estável",
+                "description": "Nenhuma anomalia crítica detectada no portfólio hoje.",
+                "severity": "info"
+            })
+
+        return insights[:3] # Retorna no máximo 3 insights
+
+    def _process_units_and_timeline(self, rows: list, today: date) -> tuple:
+        """Processa agregações por unidade e lista detalhada de vencimentos."""
+        units = {}
+        timeline = []
+
+        for row in rows:
+            raw = row.raw_contract or {}
+            analysis = row.analysis or {}
+
+            if not is_contrato_executivo_kpi_row(row.is_active, row.status, raw):
+                continue
+
+            # Unidade
+            unit_name = raw.get("unidade_compra") or raw.get("orgao") or "Não Informado"
+            if unit_name not in units:
+                units[unit_name] = {"total": 0, "critical": 0, "expiring": 0}
+            
+            units[unit_name]["total"] += 1
+            
+            # Vencimento (exclui vigência indeterminada da timeline operacional)
+            vigencia_fim = self._parse_date(raw.get("vigencia_fim"))
+            if counts_in_expiration_views(row.status, vigencia_fim, today):
+                days = (vigencia_fim - today).days
+                if 0 <= days <= 180:
+                    severity = "critical" if days <= 30 else "high" if days <= 60 else "medium"
+                    obj = raw.get("objeto") or "Objeto não informado"
+                    
+                    timeline.append({
+                        "contract_id": row.id,
+                        "contract_number": raw.get("numero") or "S/N",
+                        "contract_object": obj[:100] + ("..." if len(obj) > 100 else ""),
+                        "days_remaining": days,
+                        "severity": severity,
+                        "expiration_date": vigencia_fim.isoformat()
+                    })
+                    
+                    if days <= 30:
+                        units[unit_name]["expiring"] += 1
+
+            # Criticidade por Unidade
+            criticality = analysis.get("criticality")
+            if criticality in ("critical", "urgent"):
+                units[unit_name]["critical"] += 1
+
+        # Formata Units
+        unit_aggs = [
+            {
+                "unit": name,
+                "total_contracts": data["total"],
+                "critical_contracts": data["critical"],
+                "expiring_contracts": data["expiring"]
+            }
+            for name, data in sorted(units.items(), key=lambda x: x[1]["total"], reverse=True)
+        ][:10]
+
+        # Formata Timeline (ordenada por proximidade)
+        timeline_sorted = sorted(timeline, key=lambda x: x["days_remaining"])[:15]
+
+        return unit_aggs, timeline_sorted
 
     # ──────────────────────────────────────────────────────────────────────────
     # Helpers privados
@@ -251,7 +448,7 @@ class DashboardService:
 
             red_result = await self.session.execute(
                 select(func.count()).where(
-                    and_(Alerta.status == "active", Alerta.severity == "red")
+                    and_(Alerta.status == "active", Alerta.severity == "critical")
                 )
             )
             red = red_result.scalar() or 0

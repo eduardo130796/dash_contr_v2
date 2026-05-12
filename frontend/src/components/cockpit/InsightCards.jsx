@@ -3,12 +3,45 @@ import { useData } from '@/lib/DataContext';
 import { Lightbulb, TrendingUp, AlertOctagon, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export default function InsightCards() {
+export default function InsightCards({ insights: backendInsights }) {
   const { contracts, stats } = useData();
 
   const insights = useMemo(() => {
+    if (backendInsights && backendInsights.length > 0) {
+      const iconMap = {
+        renewal_peak: Calendar,
+        critical_risk: AlertOctagon,
+        sync_issue: Lightbulb,
+        healthy: Lightbulb
+      };
+      
+      const colorMap = {
+        critical: 'text-red-500',
+        high: 'text-orange-500',
+        medium: 'text-amber-400',
+        low: 'text-emerald-500',
+        info: 'text-primary'
+      };
+
+      const bgMap = {
+        critical: 'bg-red-500/10',
+        high: 'bg-orange-500/10',
+        medium: 'bg-amber-400/10',
+        low: 'bg-emerald-500/10',
+        info: 'bg-primary/10'
+      };
+
+      return backendInsights.map(insight => ({
+        icon: iconMap[insight.type] || Lightbulb,
+        color: colorMap[insight.severity] || 'text-primary',
+        bg: bgMap[insight.severity] || 'bg-primary/10',
+        title: insight.title,
+        description: insight.description.split('.')[0] + '.' // Pega apenas a primeira frase se for longo
+      }));
+    }
+
+    // Fallback Legado (mantido apenas por segurança)
     const items = [];
-    
     if (stats.expiring60 > 0) {
       items.push({
         icon: Calendar,
@@ -18,42 +51,8 @@ export default function InsightCards() {
         description: 'Revisar e iniciar processos de renovação para vencimentos próximos.',
       });
     }
-    
-    if (stats.urgent > 2) {
-      items.push({
-        icon: AlertOctagon,
-        color: 'text-red-500',
-        bg: 'bg-red-500/10',
-        title: 'Concentração de risco detectada',
-        description: `${stats.urgent} contratos em criticidade urgente requerem atenção executiva imediata.`,
-      });
-    }
-
-    const categories = {};
-    contracts.forEach(c => { categories[c.category] = (categories[c.category] || 0) + 1; });
-    const topCat = Object.entries(categories).sort(([,a], [,b]) => b - a)[0];
-    if (topCat) {
-      items.push({
-        icon: TrendingUp,
-        color: 'text-primary',
-        bg: 'bg-primary/10',
-        title: `Concentração do portfólio em ${topCat[0]}`,
-        description: `${topCat[1]} contratos (${Math.round(topCat[1] / contracts.length * 100)}%) são da categoria ${topCat[0]}. Considerar diversificação.`,
-      });
-    }
-
-    if (stats.expiring90 > stats.expiring30 * 2) {
-      items.push({
-        icon: Lightbulb,
-        color: 'text-emerald-500',
-        bg: 'bg-emerald-500/10',
-        title: 'Pico de vencimentos no próximo trimestre',
-        description: `${stats.expiring90} contratos vencem em até 90 dias. Planejar recursos adequadamente.`,
-      });
-    }
-
     return items.slice(0, 3);
-  }, [contracts, stats]);
+  }, [backendInsights, stats]);
 
   return (
     <div className="bg-card border border-border rounded-xl p-5">

@@ -19,13 +19,17 @@ Dentro da iteração dos secundários, roda-se: `await asyncio.sleep(self.rate_l
 * Isso impede de tomarmos bloqueio de IP. 
 * O valor de repouso é customizável pela variável global no `.env` `SYNC_RATE_LIMIT`.
 
-## 4. Segurança do Payload e Quedas de Endpoints Secundários
+## 4. Integração com Analysis Engine
+
+Toda vez que uma sincronização (Bootstrap ou Incremental) altera o estado de um contrato, o campo `last_operational_update_at` é atualizado. O Job da **Analysis Engine** monitora este campo para disparar o reprocessamento analítico de forma desacoplada, garantindo que os alertas estejam sempre sincronizados com os dados mais recentes do Comprasnet.
+
+## 5. Segurança do Payload e Quedas de Endpoints Secundários
 Se um contrato bater para pedir "Empenhos" e a rede acusar falha, HTTPStatusError (502, 504) ou RequestError:
 * É **terminantemente proibido** salvar um dict/array vazio no banco por conta desse erro.
 * Nossa inteligência age de forma conservadora mantendo o `raw_empenhos` do jeito que estava (preservação JSONB) e atualiza exclusivamente a coluna de controle do status de endpoint: `empenhos_status = 'failed'`, e a data da falha em `last_failed_sync_at`.
 * A próxima rodada tentará recalcular. A falha de sincronização NÃO pode corromper análises retrospectivas em dashboards visuais de gerência.
 
-## 5. Sincronização Sob Demanda (Manual) com Lock
+## 6. Sincronização Sob Demanda (Manual) com Lock
 Criamos rotas manuais acessíveis via endpoints:
 * **Problema:** Um gerente no dashboard clica no botão "Refazer sincronia de faturas agora", ele acerta na hora errada, o cron job rodava junto ou o gerente clica 10 vezes em pânico.
 * **Solução - asyncio.Lock:** O `SincronizacaoService` cria um bloqueio de estado atrelado unicamente ao ID que está pedindo (através de dicionário de memória `_sync_locks`). Múltiplos requests pelo mesmo contrato são enfileirados, protegidos de concorrência. Não afeta a fluidez da checagem em CRON, que navega em blocos paralelos.

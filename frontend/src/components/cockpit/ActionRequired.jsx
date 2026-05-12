@@ -1,18 +1,29 @@
-import React from 'react';
-import { useData } from '@/lib/DataContext';
-import { getDaysRemaining } from '@/lib/contractUtils';
-import { CriticalityBadge } from '@/components/shared/StatusBadge';
-import { AlertTriangle, ArrowRight, Clock } from 'lucide-react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { cn } from '@/lib/utils';
+import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { CriticalityBadge } from '@/components/shared/StatusBadge';
+import { useQuery } from '@tanstack/react-query';
+import { alertasService } from '@/services/alertasService';
 
-export default function ActionRequired() {
-  const { contracts } = useData();
+export default function ActionRequired({ actions: propActions }) {
+  const { data: alertsPayload, isLoading: isLoadingQuery } = useQuery({
+    queryKey: ['recentAlerts'],
+    queryFn: () => alertasService.getAlerts({ status: 'active', limit: 6 }),
+    refetchInterval: 30000,
+    enabled: !propActions, // Só busca se não vier via props
+  });
 
-  const urgentContracts = contracts
-    .filter(c => c.criticality === 'urgent' || c.criticality === 'critical')
-    .sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0))
-    .slice(0, 6);
+  const alerts = useMemo(() => {
+    if (propActions) return propActions;
+    const payload = alertsPayload?.data || alertsPayload;
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.items)) return payload.items;
+    return [];
+  }, [propActions, alertsPayload]);
+
+  const isLoading = !propActions && isLoadingQuery;
+
+  if (isLoading) return <div className="animate-pulse h-64 bg-accent/20 rounded-xl" />;
 
   return (
     <div className="bg-card border border-border rounded-xl p-5">
@@ -21,37 +32,49 @@ export default function ActionRequired() {
           <AlertTriangle className="w-4 h-4 text-amber-400" />
           <h3 className="text-sm font-semibold text-foreground">Ação Necessária Hoje</h3>
         </div>
-        <Link to="/contracts" className="text-xs text-primary hover:underline flex items-center gap-1">
+        <Link to="/alerts" className="text-xs text-primary hover:underline flex items-center gap-1">
           Ver todos <ArrowRight className="w-3 h-3" />
         </Link>
       </div>
       <div className="space-y-2">
-        {urgentContracts.map(c => {
-          const days = getDaysRemaining(c.end_date);
-          return (
-            <Link
-              key={c.contract_number}
-              to={`/contract/${encodeURIComponent(c.contract_number)}`}
-              className="flex items-center justify-between p-3 rounded-lg bg-accent/50 hover:bg-accent transition-colors group"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-medium text-primary">{c.contract_number}</span>
-                  <CriticalityBadge criticality={c.criticality} />
+        {alerts.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-8">Nenhuma ação crítica pendente.</p>
+        ) : (
+          alerts.map(alert => {
+            // Mapeamento de Severity Backend -> Criticality UI
+            const severityMap = {
+              critical: 'urgent',
+              high: 'critical',
+              medium: 'attention',
+              low: 'low',
+              info: 'low'
+            };
+            const uiCriticality = severityMap[alert.severity] || 'low';
+            
+            return (
+              <Link
+                key={alert.id || alert.contract_number}
+                to={alert.contract_id ? `/contract/${alert.contract_id}` : '/alerts'}
+                className="block p-3 rounded-lg bg-accent/30 hover:bg-accent transition-all border border-transparent hover:border-border/50 group"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-mono font-bold text-primary tracking-tighter">{alert.contract_number || 'SISTEMA'}</span>
+                  <CriticalityBadge criticality={uiCriticality} className="h-4 text-[9px] px-1.5" />
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 truncate">{c.object}</p>
-              </div>
-              <div className="flex items-center gap-2 ml-3 shrink-0">
-                <div className={cn("flex items-center gap-1 text-xs font-medium", days <= 30 ? 'text-red-500' : 'text-amber-400')}>
-                  <Clock className="w-3 h-3" />
-                  {days > 0 ? `${days}d` : 'Vencido'}
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </Link>
-          );
-        })}
+                <h4 
+                  className="text-xs font-bold text-foreground line-clamp-1 leading-tight first-letter:uppercase lowercase"
+                  title={alert.contract_object || 'Objeto não informado'}
+                >
+                  {alert.contract_object || 'Objeto não informado'}
+                </h4>
+                <p className="text-[10px] text-muted-foreground font-medium mt-1 uppercase tracking-tight">
+                  {alert.title}
+                </p>
+              </Link>
+            );
+          })
+        )}
       </div>
     </div>
   );
-}
+}

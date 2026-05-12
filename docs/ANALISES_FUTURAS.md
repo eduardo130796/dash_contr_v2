@@ -1,27 +1,25 @@
-# Planejamento da Engine Analítica e Novas Funcionalidades
+# Planejamento de Análises Futuras (Roadmap)
 
-Este documento estabelece as diretrizes estritas que devem ser seguidas para qualquer evolução da plataforma que envolva a construção de métricas ou geração de alertas sobre inconsistências.
+A Analysis Engine v1 estabelece a base para expansões analíticas avançadas. Abaixo estão os tópicos previstos para as próximas iterações.
 
-## 1. Separação Estrita de Responsabilidades (Sync vs Analysis)
+## 1. Score de Risco (Risk Scoring)
+- Atribuir um valor numérico (0-100) para cada contrato baseado na criticidade dos alertas ativos.
+- Agregação por Unidade Gestora ou Categoria de Contrato.
 
-Para manter a estabilidade do sistema, o isolamento entre **Busca de Dados (Sincronização)** e **Cálculo de Inconsistências (Engine Analítica)** é imutável:
-- O `SincronizacaoService` NÃO deve jamais calcular se um contrato está sem faturas ou se um saldo estourou.
-- A sincronização existe **exclusivamente** para espelhar a base externa dentro do Supabase, persistir JSONB, comparar Hashes e proteger contra quedas. Nada mais.
-- A *Analysis Engine* rodará isolada, analisando a massa de dados crua validada, avaliando as regras de negócio em cima do banco local de forma super otimizada.
+## 2. Análise Financeira Avançada
+- **Desvio de Empenho**: Alerta se o saldo empenhado for insuficiente para a média de faturamento.
+- **Glosa Crítica**: Detecção de padrões de glosas recorrentes acima de um percentual configurável.
+- **Reajuste/Repactuação**: Alerta proativo baseado em índices de inflação (IPCA/IGP-M) e data de aniversário.
 
-## 2. Fluxo Ideal de Evolução Futura
+## 3. Inteligência Artificial (AI Engine)
+- **Análise Preditiva de Vencimento**: Previsão de atrasos baseada no histórico de tramitação.
+- **Detecção de Anomalias**: Identificação de faturas fora do padrão estatístico do contrato.
+- **Assistente de Resolução**: Sugestões de ações baseadas em casos similares resolvidos anteriormente.
 
-### Camada de Motor de Regras (Rule Engine)
-1. Deve ser criado um novo módulo `backend/modules/analise/`.
-2. As lógicas de inconsistências (ex: "Empenho emitido mas sem Nota de Empenho correspondente") devem ser implementadas como classes ou métodos puros que recebam o JSONB do contrato e retornem `True/False` ou objetos de Alerta.
-3. Isso será orquestrado por um novo agendador (ex: que rode a cada poucas horas), pegando apenas os contratos que tiveram o `last_operational_update_at` alterado recentemente.
+## 4. Integração de Canais (WhatsApp/E-mail)
+- Disparo automático de notificações para alertas `critical` ou `immediate`.
+- Resumos semanais consolidados por gestor.
 
-### Lifecycle e Criação de Alertas
-- Se a *Engine Analítica* encontrar um problema, ela não deve interagir com rotas web.
-- Ela chamará o repositório do Módulo de `alertas` para inserir o problema com status `active` na tabela de alertas, respeitando o `ALERTAS.md`.
-- Na próxima rodada, se o problema houver sumido do JSONB, a engine deve marcar o alerta previamente `active` como `resolved`.
-
-## 3. Padrões Obrigatórios para Novas Regras
-- **Sem Lógica Espalhada**: Jamais coloque cálculos de inconsistência nas classes de repositório (`repositories.py`) ou rotas (`routes.py`). Tudo deve ser envelopado em classes do tipo `*Service` ou `*Analyzer`.
-- **Rastreabilidade Obrigatória**: Se uma automação encerrar ou criar um evento, ela precisa logar de forma estruturada. Use sempre `structlog.get_logger()`.
-- **Idempotência**: Uma regra precisa ser desenhada de tal forma que, se executada 100 vezes seguida sobre o mesmo contrato inalterado, não gere 100 alertas duplicados. Ela deve procurar se o alerta de mesma `severity` e `type` já está `active` naquele `contract_id` antes de inserir novos.
+## 5. Multi-tenant e Governança
+- Filtros por região, secretaria ou órgão.
+- Controle de acesso granular por categoria de alerta.

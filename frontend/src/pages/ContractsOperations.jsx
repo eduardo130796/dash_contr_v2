@@ -16,14 +16,16 @@ import { ErrorState } from '@/components/shared/DataLoadingState';
 export default function ContractsOperations() {
   // Estados de Filtro e Ordenação (SSOT no Backend agora)
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('portfolio');
   const [criticalityFilter, setCriticalityFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [instrumentKind, setInstrumentKind] = useState('contrato');
   const [sortField, setSortField] = useState('vigencia_fim');
   const [sortDir, setSortDir] = useState('desc');
   
   // Estados de Paginação e Dados
   const [items, setItems] = useState([]);
+  const [portfolioComposition, setPortfolioComposition] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -50,9 +52,14 @@ export default function ContractsOperations() {
       });
 
       if (debouncedSearch) params.append('search', debouncedSearch);
-      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (statusFilter === 'all') {
+        params.append('status', 'all');
+      } else if (statusFilter !== 'portfolio') {
+        params.append('status', statusFilter);
+      }
       if (criticalityFilter !== 'all') params.append('criticality', criticalityFilter);
       if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      params.append('instrument_kind', instrumentKind);
 
       const response = await fetch(`/api/v1/contracts?${params.toString()}`);
       if (!response.ok) throw new Error(`Erro API: ${response.status}`);
@@ -61,6 +68,7 @@ export default function ContractsOperations() {
       if (payload.success) {
         setItems(payload.data.items);
         setPagination(payload.data.pagination);
+        setPortfolioComposition(payload.data.portfolio_composition ?? null);
       } else {
         throw new Error(payload.message || 'Erro ao carregar contratos');
       }
@@ -70,7 +78,7 @@ export default function ContractsOperations() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, debouncedSearch, statusFilter, criticalityFilter, categoryFilter, sortField, sortDir]);
+  }, [pagination.page, pagination.limit, debouncedSearch, statusFilter, criticalityFilter, categoryFilter, instrumentKind, sortField, sortDir]);
 
   // Efeito de trigger para recarregar quando filtros mudam
   useEffect(() => {
@@ -80,7 +88,7 @@ export default function ContractsOperations() {
   // Reset de página quando filtros mudam
   useEffect(() => {
     setPagination(p => ({ ...p, page: 1 }));
-  }, [debouncedSearch, statusFilter, criticalityFilter, categoryFilter]);
+  }, [debouncedSearch, statusFilter, criticalityFilter, categoryFilter, instrumentKind]);
 
   const toggleSort = (field) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -118,9 +126,37 @@ export default function ContractsOperations() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Central de Operações Contratuais</h1>
-          <p className="text-sm text-muted-foreground">
-            {loading ? 'Carregando...' : `${pagination.total} contratos encontrados`}
-          </p>
+          <div>
+            <p className="text-sm text-muted-foreground">
+              {loading
+                ? 'Carregando...'
+                : `${pagination.total} ${
+                    instrumentKind === 'contrato'
+                      ? 'contratos'
+                      : instrumentKind === 'all'
+                        ? 'instrumentos'
+                        : 'registros'
+                  } no escopo selecionado`}
+            </p>
+            {!loading &&
+              instrumentKind === 'all' &&
+              Array.isArray(portfolioComposition) &&
+              portfolioComposition.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed max-w-3xl">
+                  <span className="font-medium text-foreground/80">Composição do portfólio</span>
+                  {' — '}
+                  {portfolioComposition.map((b, i) => (
+                    <span key={`${b.normalized_tipo}-${i}`}>
+                      {i > 0 ? ' · ' : ''}
+                      <span className="tabular-nums font-semibold text-foreground">{b.count}</span>
+                      {' «'}
+                      {b.normalized_tipo?.trim() ? b.normalized_tipo : 'sem tipo declarado'}
+                      {'»'}
+                    </span>
+                  ))}
+                </p>
+              )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant={view === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setView('table')}>
@@ -136,13 +172,23 @@ export default function ContractsOperations() {
       <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Buscar contratos..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+          <Input placeholder="Buscar instrumentos..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
           {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 animate-spin text-muted-foreground" />}
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Situação" /></SelectTrigger>
+        <Select value={instrumentKind} onValueChange={setInstrumentKind}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Instrumento" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas as Situações</SelectItem>
+            <SelectItem value="contrato">Contratos</SelectItem>
+            <SelectItem value="empenho">Empenhos</SelectItem>
+            <SelectItem value="ata">Atas</SelectItem>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-52"><SelectValue placeholder="Situação" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="portfolio">Portfólio executivo</SelectItem>
+            <SelectItem value="all">Todas as situações</SelectItem>
             <SelectItem value="ativo">Ativo</SelectItem>
             <SelectItem value="vencendo">Vencendo</SelectItem>
             <SelectItem value="vencido">Vencido</SelectItem>
@@ -292,7 +338,8 @@ export default function ContractsOperations() {
           {/* Pagination Controls */}
           <div className="px-4 py-3 border-t border-border bg-accent/10 flex items-center justify-between">
             <div className="text-xs text-muted-foreground font-medium">
-              Mostrando <span className="text-foreground">{items.length}</span> de <span className="text-foreground">{pagination.total}</span> contratos
+              Mostrando <span className="text-foreground">{items.length}</span> de <span className="text-foreground">{pagination.total}</span>{' '}
+              {instrumentKind === 'contrato' ? 'contratos' : 'registros'}
             </div>
             <div className="flex items-center gap-1">
               <Button 

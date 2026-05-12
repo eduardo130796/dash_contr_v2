@@ -15,15 +15,36 @@ import {
 import { format } from 'date-fns';
 import { LoadingOverlay, ErrorState } from '@/components/shared/DataLoadingState';
 
-export default function ExecutiveCockpit() {
-  const { stats, loading, error } = useData();
+import { useQuery } from '@tanstack/react-query';
+import { dashboardService } from '@/services/dashboardService';
 
-  if (loading) return <LoadingOverlay message="Carregando plataforma de inteligência contratual…" />;
-  if (error)   return <ErrorState message={error} />;
+export default function ExecutiveCockpit() {
+  const { loading: dataLoading, error: dataError } = useData();
+
+  const { data: dashboardPayload, isLoading: isLoadingDashboard } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: () => dashboardService.getDashboardStats(),
+    refetchInterval: 60000,
+  });
+
+  const dashboardData = dashboardPayload?.data || dashboardPayload || {};
+  const stats = dashboardData.kpis || {};
+  const criticidadeBruta =
+    dashboardData.criticality_distribution ?? dashboardData.criticalityDistribution;
+  
+  if (dataLoading || isLoadingDashboard) return <LoadingOverlay message="Carregando plataforma de inteligência contratual…" />;
+  if (dataError) return <ErrorState message={dataError} />;
+
+  // Dados adicionais para os subcomponentes
+  const urgentActions = dashboardData.urgent_actions || [];
+  const executiveInsights = dashboardData.executive_insights || [];
+  const unitsData = dashboardData.contracts_by_unit || [];
+  const timelineData = dashboardData.expiration_timeline || [];
+  const expirationChartData = dashboardData.expirationTimeline || [];
 
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* Page Header */}
+      {/* ... header ... */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Painel Executivo</h1>
@@ -41,7 +62,13 @@ export default function ExecutiveCockpit() {
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <KPICard title="Contratos Ativos" value={stats.totalActive} icon={FileText} variant="primary" />
+        <KPICard
+          title="Contratos Ativos"
+          value={stats.totalActive}
+          icon={FileText}
+          variant="primary"
+          subtitle={`Empenhos: ${stats.activeEmpenhos ?? 0} · Atas: ${stats.activeAtas ?? 0}`}
+        />
         <KPICard title="Vencendo em 30d" value={stats.expiring30} icon={Clock} variant="danger" />
         <KPICard title="Vencendo em 60d" value={stats.expiring60} icon={Clock} variant="warning" />
         <KPICard title="Vencendo em 90d" value={stats.expiring90} icon={Clock} />
@@ -77,19 +104,19 @@ export default function ExecutiveCockpit() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ExpirationChart />
-        <CriticalityDistribution />
+        <ExpirationChart data={expirationChartData} />
+        <CriticalityDistribution kpis={stats} criticalityDistribution={criticidadeBruta} />
       </div>
 
       {/* Middle Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <ActionRequired />
-        <InsightCards />
-        <ContractsByUnit />
+        <ActionRequired actions={urgentActions} />
+        <InsightCards insights={executiveInsights} />
+        <ContractsByUnit data={unitsData} />
       </div>
 
       {/* Timeline */}
-      <ExpirationTimeline />
+      <ExpirationTimeline data={timelineData} />
     </div>
   );
 }

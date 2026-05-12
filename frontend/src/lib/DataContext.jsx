@@ -10,12 +10,16 @@ const DataContext = createContext();
  */
 const EMPTY_STATS = {
   totalActive: 0,
+  activeEmpenhos: 0,
+  activeAtas: 0,
   expiring30: 0,
   expiring60: 0,
   expiring90: 0,
   expiring180: 0,
   critical: 0,
   urgent: 0,
+  attention: 0,
+  low: 0,
   strategic: 0,
   totalValue: 0,
   activeAlerts: 0,

@@ -54,9 +54,20 @@ class PaginationInfo(BaseModel):
     pages: int
 
 
+class PortfolioTipoBucket(BaseModel):
+    """Contagem dinâmica por `normalized_tipo_instrumento` (SSOT no backend)."""
+
+    normalized_tipo: str
+    """Chave normalizada; string vazia = tipo ausente no JSON."""
+
+    count: int
+
+
 class ContractListResponse(BaseModel):
     items: list[ContractListItem]
     pagination: PaginationInfo
+    portfolio_composition: Optional[list[PortfolioTipoBucket]] = None
+    """Preenchido quando `instrument_kind=all`: distribuição auditável do portfólio no mesmo escopo dos filtros."""
 
 
 # ─── SCHEMAS ANALÍTICOS (CONTRACT 360) ───

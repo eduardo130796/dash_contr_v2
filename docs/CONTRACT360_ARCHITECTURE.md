@@ -94,7 +94,14 @@ O payload é o SSOT (Single Source of Truth) absoluto para o frontend.
 }
 ```
 
-## 3. Camada de Apresentação (Frontend)
+## 3. Inteligência e Alertas (Analysis Engine)
+
+Diferente dos dados brutos, a seção de alertas e riscos do Contract 360 é alimentada de forma assíncrona pela **Analysis Engine**:
+- **Idempotência**: Alertas são persistidos via `fingerprint` único.
+- **Resolução Automática**: Alertas desaparecem se a causa for corrigida.
+- **Rastreabilidade**: Inclui `analyzer_name` e `recommended_action`.
+
+## 4. Camada de Apresentação (Frontend)
 
 O frontend torna-se uma camada de renderização pura ("Pure Renderer"):
 - **Padronização:** Todas as datas e valores são formatados via `frontend/src/utils/formatters.js`.

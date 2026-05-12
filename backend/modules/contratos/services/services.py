@@ -5,9 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.modules.contratos.repositories.repositories import ContratoRepository
 from backend.modules.contratos.schemas.schemas import (
-    ContractListResponse, 
-    ContractListItem, 
+    ContractListResponse,
+    ContractListItem,
     PaginationInfo,
+    PortfolioTipoBucket,
     Contrato360Response,
     ResumoContratoSchema,
     FinanceiroSchema,
@@ -36,6 +37,7 @@ class ContratoService:
         category: Optional[str] = None,
         sort_by: str = "vigencia_fim",
         order: str = "desc",
+        instrument_kind: Optional[str] = None,
     ) -> ContractListResponse:
         items, total = await self.repository.list_contracts(
             page=page,
@@ -46,7 +48,20 @@ class ContratoService:
             category=category,
             sort_by=sort_by,
             order=order,
+            instrument_kind=instrument_kind,
         )
+
+        portfolio_composition: Optional[list[PortfolioTipoBucket]] = None
+        if (instrument_kind or "contrato").strip().lower() == "all":
+            comp_rows = await self.repository.aggregate_portfolio_composition_by_normalized_tipo(
+                status=status,
+                criticality=criticality,
+                category=category,
+                search=search,
+            )
+            portfolio_composition = [
+                PortfolioTipoBucket(normalized_tipo=nt, count=cnt) for nt, cnt in comp_rows
+            ]
 
         contract_items = []
         for item in items:
@@ -88,7 +103,8 @@ class ContratoService:
                 limit=limit,
                 total=total,
                 pages=pages
-            )
+            ),
+            portfolio_composition=portfolio_composition,
         )
 
     async def get_contract_360(self, contract_id: str) -> Optional[Contrato360Response]:

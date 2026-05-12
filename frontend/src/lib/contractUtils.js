@@ -19,20 +19,34 @@ export function formatCompactCurrency(value) {
 
 export function getSeverityColor(severity) {
   const colors = {
+    // Legado/Mock
     green: 'text-emerald-500',
     yellow: 'text-amber-400',
     orange: 'text-orange-500',
     red: 'text-red-500',
+    // Novos Enums Backend
+    critical: 'text-red-500',
+    high: 'text-orange-500',
+    medium: 'text-amber-400',
+    low: 'text-emerald-500',
+    info: 'text-blue-400'
   };
   return colors[severity] || 'text-muted-foreground';
 }
 
 export function getSeverityBg(severity) {
   const colors = {
+    // Legado/Mock
     green: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
     yellow: 'bg-amber-400/10 text-amber-500 border-amber-400/20',
     orange: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
     red: 'bg-red-500/10 text-red-500 border-red-500/20',
+    // Novos Enums Backend
+    critical: 'bg-red-500/10 text-red-500 border-red-500/20',
+    high: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+    medium: 'bg-amber-400/10 text-amber-500 border-amber-400/20',
+    low: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+    info: 'bg-blue-500/10 text-blue-500 border-blue-500/20'
   };
   return colors[severity] || 'bg-muted text-muted-foreground';
 }

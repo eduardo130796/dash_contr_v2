@@ -27,9 +27,10 @@ A navegação é gerenciada via `react-router-dom` a partir do `App.jsx`.
 ## 2. Fluxos Principais (Pages)
 
 ### 2.1. ExecutiveCockpit (`/`)
-- **Objetivo:** Painel de alto nível para a gestão executiva.
-- **Componentes Base:** KPICards, ExpirationChart, CriticalityDistribution, ActionRequired, InsightCards, ContractsByUnit, ExpirationTimeline.
-- **Acoplamento de Dados:** Consome `useData()` e exibe `stats` calculados no cliente em tempo real, baseando-se no array de `contracts` e `alerts`.
+- **Objetivo:** Painel executivo ultra-compacto para sinalização rápida e priorização.
+- **Componentes Base:** KPICards, ActionRequired, InsightCards, ContractsByUnit, ExpirationTimeline.
+- **Filosofia Visual:** Escaneabilidade imediata. Remove descrições longas e metadados operacionais, focando na tríade: Identificação, Objeto e Prazo/Urgência.
+- **Acoplamento de Dados:** Consome o payload enriquecido de `/api/v1/dashboard/stats`, que já entrega objetos de contrato e dias restantes calculados pelo backend.
 
 ### 2.2. ContractsOperations (`/contracts`)
 - **Objetivo:** Tabela analítica e visualização Kanban de todos os contratos.
@@ -53,41 +54,37 @@ A navegação é gerenciada via `react-router-dom` a partir do `App.jsx`.
 - **Acoplamento:** Calcula `avgRisk` e `highRisk` em tempo real iterando sobre os contratos vindos de `useData()`.
 
 ### 2.5. AlertCenter (`/alerts`)
-- **Objetivo:** Central de notificações operacionais e financeiras.
-- **Acoplamento:** Consome a lista de `alerts` do `DataContext`.
+- **Objetivo:** Central operacional de investigação e governança.
+- **Mecanismos Internos:**
+  - Consome o endpoint `/api/v1/alertas` com suporte a busca textual e filtros avançados.
+  - Exibe o detalhamento completo: recomendações, fontes, analisadores e timestamps.
+  - Gerencia o ciclo de vida: Marcar como Visto (Viewed) e Dispensar (Dismissed).
+- **UX:** Foco em produtividade e resolução de problemas técnicos/contratuais identificados pela Engine.
 
 ---
 
-## 3. Dependências e Contextos (Contexts & Hooks)
+## 3. Camada de Serviços (Services)
 
-O coração do estado do frontend atual é o `DataContext.jsx`:
-- **Estado Global:** Mantém `contracts`, `alerts`, `events` (mock), `amendments` (mock).
-- **Memoization:** Usa `useMemo` para recalcular as estatísticas (`stats`) globais sempre que `contracts` ou `alerts` mudam, através da função `buildStats()`.
-- **Fetching centralizado:** Faz um único fetch gigante para `/api/dashboard` durante o mount da aplicação. Isso injeta todos os dados no cliente.
+Introduzida para isolar a comunicação com a API do backend:
+- `alertasService.js`: Gerencia chamadas para `/api/v1/alertas`, incluindo estatísticas, listagem, reconhecimento (`view`) e dispensa (`dismiss`).
 
----
+## 4. Estado Global e Fetching (React Query)
 
-## 4. Lógica de Negócio Encontrada no Frontend (A MIGRAR/COMPARTILHAR)
-Muitas regras de negócio vitais estão implementadas estritamente do lado cliente, o que representa um acoplamento perigoso se outros clientes consumirem a API.
-
-- **Status & Normalização (`lib/contractUtils.js`):**
-  - A função `normalizeStatus` mapeia `ativo_com_execucao_no_ano` -> `ativo_operacional` e `vencido_com_execucao_no_ano` -> `vencido_com_execucao_recente`. O frontend faz a adaptação da nomenclatura.
-- **Cálculos de Criticidade e Risco (`lib/contractUtils.js` e `RiskCenter.jsx`):**
-  - Definição visual baseada em ranges de risco (ex: `>= 75` é vermelho, `< 30` é verde).
-  - Cálculo de Média de Risco em `RiskCenter.jsx` (`avgRisk = sum(risk_score) / length`).
-- **Cálculos Temporais (`lib/contractUtils.js`):**
-  - `getDaysRemaining` para saber dias até o término.
-  - Agrupamento de vencimentos (em 30, 60, 90, 180 dias) dentro de `buildStats` em `DataContext`.
-- **Estatísticas Agregadas (`DataContext.jsx - buildStats`):**
-  - Cálculo total de valor de portfólio via `.reduce`.
-  - Filtro para contratos não expirados/suspensos.
-  - Filtro para encontrar contratos `strategic`, `urgent`, `critical`.
-- **Busca, Filtragem e Ordenação (`ContractsOperations.jsx`):**
-  - O filtro e a busca (`search`, `statusFilter`, `criticalityFilter`, `categoryFilter`) bem como a ordenação (`sortField`, `sortDir`) ocorrem 100% no navegador via JavaScript.
+A aplicação está transicionando do `DataContext` (fetch gigante no mount) para o **React Query**:
+- **Granularidade:** Cada componente ou página pode buscar seus dados específicos de forma assíncrona.
+- **Caching & Retry:** Utiliza as capacidades nativas do `@tanstack/react-query` para gerenciar estados de loading, erro e re-sincronização automática.
+- **Consistência:** O backend é o SSOT. O frontend mapeia os ENUMs do backend para classes visuais (Tailwind) sem aplicar lógica de negócio.
 
 ---
 
-## 5. Mocks e Estruturas Temporárias Identificadas
+## 5. Mapeamento de Regras (Frontend como Renderer)
+
+- **Severidades:** O mapeamento de enums (`critical`, `high`, `medium`, `low`) para cores (`red`, `orange`, `yellow`, `green`) é centralizado em `contractUtils.js`.
+- **Status:** O ciclo de vida dos alertas (`active`, `viewed`, `resolved`) é gerenciado pelo backend. O frontend apenas reflete o estado atual.
+
+---
+
+## 6. Mocks e Estruturas Temporárias Identificadas
 1. **Eventos e Aditivos no `DataContext`:**
    - As variáveis de estado `events` e `amendments` são inicializadas como arrays vazios e referenciadas como "ainda mock (depois fazemos)" nos comentários do `DataContext.jsx`.
 2. **Dados fakes injetados:**

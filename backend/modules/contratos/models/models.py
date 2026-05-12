@@ -38,7 +38,11 @@ class Contrato(Base):
     responsaveis_status = Column(String, default="pending")
     itens_status = Column(String, default="pending")
 
-    # Timestamps
+    # Timestamps e Metadados Analíticos
+    last_analysis_at = Column(DateTime(timezone=True))
+    analysis_version = Column(String, default="1.0.0")
+
+    # Timestamps de Sincronização
     last_sync_at = Column(DateTime(timezone=True))
     last_main_update_at = Column(DateTime(timezone=True))
     last_operational_update_at = Column(DateTime(timezone=True))

@@ -20,11 +20,21 @@ async def list_contracts(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
+    status: Optional[str] = Query(
+        None,
+        description=(
+            "Filtro de situação. Omitido = portfólio executivo (paridade com /dashboard/stats). "
+            "`all` = sem filtro de situação."
+        ),
+    ),
     criticality: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     sort_by: str = Query("vigencia_fim"),
     order: str = Query("desc", regex="^(asc|desc)$"),
+    instrument_kind: str = Query(
+        "contrato",
+        description="contrato | empenho | ata | all — escopo de instrumento (padrão = cockpit).",
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     service = ContratoService(db)
@@ -38,6 +48,7 @@ async def list_contracts(
             category=category,
             sort_by=sort_by,
             order=order,
+            instrument_kind=instrument_kind,
         )
         return success_response(data=data.model_dump(), message="Contratos listados com sucesso")
     except Exception as e:
