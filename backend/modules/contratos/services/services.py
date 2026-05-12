@@ -21,11 +21,12 @@ from backend.modules.contratos.schemas.schemas import (
     GrupoResponsavelSchema,
     PessoaResponsavelSchema
 )
-
+from backend.modules.alertas.repositories.alertas_repository import AlertasRepository
 
 class ContratoService:
     def __init__(self, session: AsyncSession):
         self.repository = ContratoRepository(session)
+        self.alertas_repository = AlertasRepository(session)
 
     async def list_contracts(
         self,
@@ -90,7 +91,9 @@ class ContratoService:
                     criticality=analysis.get("criticality") or "low",
                     risk_score=analysis.get("risk_score"),
                     category=analysis.get("category") or raw.get("categoria"),
-                    value=valor
+                    value=valor,
+                    alerts_count=item.alerts_count or 0,
+                    highest_alert_severity=item.highest_alert_severity,
                 )
             )
 
@@ -106,6 +109,7 @@ class ContratoService:
             ),
             portfolio_composition=portfolio_composition,
         )
+
 
     async def get_contract_360(self, contract_id: str) -> Optional[Contrato360Response]:
         """
@@ -181,16 +185,19 @@ class ContratoService:
         )
 
         # 5. ALERTAS
-        alertas_raw = analysis.get("flags") or []
+        alertas_raw = await self.alertas_repository.list_active_by_contract(
+            contrato.id
+        )
         alertas = [
             AlertaSchema(
-                id=f"alert-{i}",
-                tipo="automatico",
-                titulo=a.get("title") or a.get("titulo") or "Alerta de Sistema",
-                descricao=a.get("message") or a.get("descricao") or "",
-                severidade=a.get("severity") or a.get("severidade") or "blue",
-                data=a.get("date") or datetime.now(timezone.utc).isoformat()
-            ) for i, a in enumerate(alertas_raw)
+                id=str(a.id),
+                tipo=a.category or "automatico",
+                titulo=a.title or "Alerta do Sistema",
+                descricao=a.message or "",
+                severidade=a.severity or "low",
+                data=a.created_at.isoformat() if a.created_at else None,
+            )
+            for a in alertas_raw
         ]
 
         # 6. ADITIVOS

@@ -1,7 +1,16 @@
 from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, or_, and_, cast, String, desc, asc
+from sqlalchemy import (
+    func,
+    or_,
+    and_,
+    cast,
+    String,
+    desc,
+    asc,
+    case,
+)
 
 from backend.core.logging.logger import log
 from backend.modules.contratos.models.models import Contrato
@@ -10,6 +19,8 @@ from backend.modules.contratos.domain.ativo_rules import (
     is_contrato_executivo_kpi_row,
     normalized_tipo_instrumento,
 )
+from backend.modules.alertas.models.models import Alerta
+from backend.modules.alertas.models.enums import AlertStatusEnum
 
 
 class ContratoRepository:
@@ -199,8 +210,56 @@ class ContratoRepository:
             category=category,
             search=search,
         )
+        severity_rank = (
+            func.max(
+                case(
+                    (
+                        Alerta.severity == "critical",
+                        4,
+                    ),
+                    (
+                        Alerta.severity == "high",
+                        3,
+                    ),
+                    (
+                        Alerta.severity == "medium",
+                        2,
+                    ),
+                    else_=1,
+                )
+            )
+        ).label("severity_rank")
 
-        query = select(Contrato)
+        alerts_subquery = (
+            select(
+                Alerta.contract_id.label("contract_id"),
+                func.count(Alerta.id).label("alerts_count"),
+                severity_rank,
+            )
+            .where(
+                Alerta.status.in_(
+                    [
+                        AlertStatusEnum.ACTIVE,
+                        AlertStatusEnum.VIEWED,
+                    ]
+                )
+            )
+            .group_by(Alerta.contract_id)
+            .subquery()
+        )
+
+        query = (
+            select(
+                Contrato,
+                alerts_subquery.c.alerts_count,
+                alerts_subquery.c.severity_rank,
+            )
+            .outerjoin(
+                alerts_subquery,
+                Contrato.id == alerts_subquery.c.contract_id,
+            )
+        )
+
         if filters:
             query = query.where(and_(*filters))
 
@@ -230,7 +289,27 @@ class ContratoRepository:
         query = query.offset((page - 1) * limit).limit(limit)
 
         result = await self.session.execute(query)
-        items = list(result.scalars().all())
+        rows = result.all()
+
+        items = []
+
+        for contrato, alerts_count, severity_rank in rows:
+
+            highest_alert_severity = None
+
+            if severity_rank == 4:
+                highest_alert_severity = "critical"
+            elif severity_rank == 3:
+                highest_alert_severity = "high"
+            elif severity_rank == 2:
+                highest_alert_severity = "medium"
+            elif severity_rank == 1:
+                highest_alert_severity = "low"
+
+            contrato.alerts_count = alerts_count or 0
+            contrato.highest_alert_severity = highest_alert_severity
+
+            items.append(contrato)
 
         log.debug(
             "contracts_list_result",

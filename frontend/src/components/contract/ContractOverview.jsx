@@ -40,38 +40,10 @@ export default function ContractOverview({ resumo, riscos, alertas, aditivosCoun
         <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm">
             <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Suporte à Decisão</h3>
 
-            {/* 🔥 RESUMO (STATUS) */}
-            <div className="text-sm font-medium min-h-[1.5rem]">
-                {resumo?.situacao_real === "ativo_sem_execucao" && (
-                  <span className="text-red-500 font-bold flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                    Contrato ativo sem execução financeira detectada
-                  </span>
-                )}
-            </div>
 
             {/* 🔴 ALERTAS (AGORA COMPACTOS) */}
-           <ContractAlerts alerts={alertas} compact />
+           <ContractAlerts alerts={alertas} variant="decision" />
 
-            {/* 🔵 AÇÃO */}
-            <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
-                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Próximos Passos Recomendados</p>
-
-                {actions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground italic">
-                    Nenhuma ação prioritária identificada no momento.
-                    </p>
-                ) : (
-                    <ul className="text-sm space-y-2">
-                    {actions.map((a, i) => (
-                        <li key={i} className="flex gap-2 items-start">
-                          <span className="text-primary mt-1">•</span>
-                          <span className="text-foreground/80 font-medium leading-relaxed">{a}</span>
-                        </li>
-                    ))}
-                    </ul>
-                )}
-            </div>
 
             {/* 📊 INDICADORES RÁPIDOS */}
             <div className="grid grid-cols-3 gap-3 text-[10px] pt-4 border-t border-border">

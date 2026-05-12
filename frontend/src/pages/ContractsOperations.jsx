@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Search, Filter, ArrowUpDown, LayoutList, LayoutGrid, 
-  ChevronRight, ChevronLeft, Download, Loader2 ,CalendarDays, Flag
+  ChevronRight, ChevronLeft, Download, Loader2 ,CalendarDays, Flag,AlertTriangle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -269,7 +269,27 @@ export default function ContractsOperations() {
                   return (
                     <tr key={c.id} className="border-b border-border/50 hover:bg-accent/20 transition-colors">
                       <td className="px-4 py-3">
-                        <span className="font-mono text-xs font-medium text-primary">{c.contract_number}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-medium text-primary">
+                            {c.contract_number}
+                          </span>
+
+                          {c.alerts_count > 0 && (
+                            <div
+                              title={`${c.alerts_count} pendência(s) operacional(is)`}
+                              className={cn(
+                                "flex items-center justify-center rounded-full",
+                                c.highest_alert_severity === "critical"
+                                ? "text-red-500"
+                                : c.highest_alert_severity === "high"
+                                ? "text-orange-500"
+                                : "text-amber-400"
+                              )}
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 max-w-[380px] min-w-[320px]">
                         <span className="text-xs truncate block" title={c.object}>{c.object}</span>

@@ -101,7 +101,17 @@ export default function Contract360() {
               <StatusBadge status={resumo?.situacao_real} />
               <CriticalityBadge criticality={riscos?.nivel === 'crítico' ? 'critical' : riscos?.nivel === 'alto' ? 'urgent' : 'low'} />
             </div>
-            <p className="text-sm text-muted-foreground max-w-2xl">{resumo?.objeto || "Objeto não informado"}</p>
+            <p
+              className="
+                mt-1
+                max-w-5xl
+                text-xs
+                leading-relaxed
+                text-foreground/65
+              "
+            >
+              {resumo?.objeto || "Objeto não informado"}
+            </p>
           </div>
 
           <div className="flex items-center gap-6 shrink-0 bg-accent/20 p-3 rounded-xl border border-border/50">

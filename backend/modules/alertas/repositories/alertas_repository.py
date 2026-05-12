@@ -185,3 +185,24 @@ class AlertasRepository:
         stats["resolved_today"] = res_resolved.scalar() or 0
         
         return stats
+
+    async def list_active_by_contract(self, contract_id: str):
+        stmt = (
+            select(Alerta)
+            .where(
+                Alerta.contract_id == contract_id,
+                Alerta.status.in_(
+                    [
+                        AlertStatusEnum.ACTIVE,
+                        AlertStatusEnum.VIEWED,
+                    ]
+                )
+            )
+            .order_by(
+                Alerta.created_at.desc()
+            )
+        )
+
+        result = await self.session.execute(stmt)
+
+        return result.scalars().all()

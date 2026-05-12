@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
+import { AlertTriangle } from "lucide-react";
 
-export default function ContractAlerts({ alerts = [], compact = false }) {
+export default function ContractAlerts({ alerts = [], compact = false,variant = "default", }) {
   // O backend agora envia o array de alertas já processados e classificados.
   // Schema AlertaSchema: { id, tipo, titulo, descricao, severidade, data }
   
@@ -13,6 +14,73 @@ export default function ContractAlerts({ alerts = [], compact = false }) {
   });
 
   const visibleAlerts = compact ? sortedAlerts.slice(0, 3) : sortedAlerts;
+  if (variant === "decision") {
+    return (
+      <div className="space-y-2">
+        {visibleAlerts.map((a, i) => {
+          const isCritical = a.severidade === "red";
+
+          return (
+            <div
+              key={a.id || i}
+              className={cn(
+                "rounded-lg border p-3 transition-all",
+                isCritical
+                  ? "border-red-500/10 bg-red-500/[0.02]"
+                  : "border-border/40 bg-primary/[0.03]"
+              )}
+            >
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle
+                  className={cn(
+                    "w-3.5 h-3.5 mt-0.5 shrink-0",
+                    isCritical
+                      ? "text-red-400"
+                      : "text-primary"
+                  )}
+                />
+
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={cn(
+                      "text-xs font-semibold leading-none",
+                      isCritical
+                        ? "text-red-300"
+                        : "text-foreground"
+                    )}
+                  >
+                    {a.titulo}
+                  </p>
+
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    {a.descricao}
+                  </p>
+
+                  <div className="mt-2">
+                    <p
+                      className={cn(
+                        "text-[9px] uppercase tracking-wider font-bold mb-1",
+                        isCritical
+                          ? "text-red-400"
+                          : "text-primary"
+                      )}
+                    >
+                      Próxima ação
+                    </p>
+
+                    <p className="text-xs text-foreground/80 leading-relaxed">
+                      {a.recommended_action ||
+                        "Validar e tratar a pendência identificada."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   if (compact) {
     return (

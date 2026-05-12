@@ -45,6 +45,8 @@ class ContractListItem(BaseModel):
     risk_score: Optional[int] = None
     category: Optional[str] = None
     value: float
+    alerts_count: int = 0
+    highest_alert_severity: Optional[str] = None
 
 
 class PaginationInfo(BaseModel):
