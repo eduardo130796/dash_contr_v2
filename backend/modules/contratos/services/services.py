@@ -88,8 +88,8 @@ class ContratoService:
                     end_date=raw.get("vigencia_fim"),
                     manager=raw.get("gestor") or "Não atribuído",
                     status=situacao,
-                    criticality=analysis.get("criticality") or "low",
-                    risk_score=analysis.get("risk_score"),
+                    criticality=analysis.get("criticidade") or analysis.get("criticality") or "baixa",
+                    risk_score=analysis.get("risco_score") or analysis.get("risk_score"),
                     category=analysis.get("category") or raw.get("categoria"),
                     value=valor,
                     alerts_count=item.alerts_count or 0,
@@ -176,12 +176,14 @@ class ContratoService:
         timeline = self._compose_timeline(historico_base + eventos_contract)
 
         # 4. RISCOS
-        score = analysis.get("risk_score") or 0
         riscos = RiscoSchema(
-            score=score,
-            saude=max(0, 100 - score),
-            nivel=self._derive_risk_level(score),
-            fatores=analysis.get("risk_factors") or []
+            saude_score=analysis.get("saude_score", 100),
+            saude_nivel=analysis.get("saude_nivel", "excelente"),
+            criticidade=analysis.get("criticidade", "baixa"),
+            risco_score=analysis.get("risco_score", 0),
+            risco_nivel=analysis.get("risco_nivel", "baixo"),
+            fatores=analysis.get("fatores", []),
+            resumo_operacional=analysis.get("resumo_operacional", {})
         )
 
         # 5. ALERTAS

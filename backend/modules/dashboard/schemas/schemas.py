@@ -27,20 +27,17 @@ class DashboardKPIs(BaseModel):
     """Contratos ativos com vencimento em até 180 dias."""
 
     # Criticidade
-    critical: int
-    """Contratos com criticidade 'critical'."""
-
-    urgent: int
-    """Contratos com criticidade 'urgent'."""
-
-    attention: int
-    """Contratos com criticidade 'attention'."""
-
-    low: int
-    """Contratos com criticidade 'low'."""
-
-    strategic: int
+    estrategica: int
     """Contratos marcados como estratégicos."""
+
+    alta: int
+    """Contratos com criticidade 'alta'."""
+
+    media: int
+    """Contratos com criticidade 'média'."""
+
+    baixa: int
+    """Contratos com criticidade 'baixa'."""
 
     # Valor financeiro
     totalValue: float
@@ -100,6 +97,10 @@ class ExpirationTimelineDetail(BaseModel):
     severity: str
     expiration_date: str
 
+class ClosurePendingSummary(BaseModel):
+    total: int = 0
+    critical: int = 0
+
 class DashboardStatsResponse(BaseModel):
     """Payload completo retornado por GET /api/v1/dashboard/stats."""
 
@@ -109,3 +110,4 @@ class DashboardStatsResponse(BaseModel):
     executive_insights: list[ExecutiveInsight] = []
     contracts_by_unit: list[UnitAggregation] = []
     expiration_timeline: list[ExpirationTimelineDetail] = []
+    closure_pending: ClosurePendingSummary | None = None

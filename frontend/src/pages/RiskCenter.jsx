@@ -26,8 +26,8 @@ export default function RiskCenter() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPICard title="Risco Médio" value={avgRisk} subtitle="Média do portfólio" icon={Activity} variant={avgRisk >= 50 ? 'danger' : 'warning'} />
         <KPICard title="Alto Risco" value={highRisk} subtitle="Pontuação ≥ 70" icon={AlertTriangle} variant="danger" />
-        <KPICard title="Urgentes" value={stats.urgent} subtitle="Requerem ação imediata" icon={AlertOctagon} variant="danger" />
-        <KPICard title="Críticos" value={stats.critical} subtitle="Criticidade elevada" icon={Shield} variant="warning" />
+        <KPICard title="Estratégicos" value={stats.estrategica} subtitle="Alto impacto institucional" icon={AlertOctagon} variant="danger" />
+        <KPICard title="Alta Criticidade" value={stats.alta} subtitle="Criticidade elevada" icon={Shield} variant="warning" />
       </div>
 
       {/* Matrix + Ranking */}

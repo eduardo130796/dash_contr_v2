@@ -28,7 +28,7 @@ class ContratoDetailResponse(ContratoResponse):
     raw_responsaveis: Optional[Any] = None
     raw_itens: Optional[Any] = None
 
-    analysis: Optional[Any] = None
+    analysis: Optional[Dict[str, Any]] = None
 
 
 class ContractListItem(BaseModel):
@@ -117,10 +117,13 @@ class EventoTimelineSchema(BaseModel):
 
 
 class RiscoSchema(BaseModel):
-    score: int
-    saude: int
-    nivel: str
+    saude_score: int = 100
+    saude_nivel: str = "excelente"
+    criticidade: str = "baixa"
+    risco_score: int = 0
+    risco_nivel: str = "baixo"
     fatores: list[dict] = []
+    resumo_operacional: Optional[dict] = None
 
 
 class AlertaSchema(BaseModel):

@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from backend.modules.analise.analyzers.base import BaseAnalyzer
+from backend.modules.analise.domain.enrichment import is_dataset_ready
 from backend.modules.analise.schemas.alert_candidate import AlertCandidate
 from backend.modules.alertas.models.enums import (
     AlertCategoryEnum,
@@ -25,6 +26,9 @@ class MissingGuaranteeAnalyzer(BaseAnalyzer):
     async def analyze(self, contract) -> list[AlertCandidate]:
 
         if not contract:
+            return []
+
+        if not is_dataset_ready(contract, "garantias"):
             return []
 
         raw = contract.raw_contract or {}
@@ -78,7 +82,7 @@ class MissingGuaranteeAnalyzer(BaseAnalyzer):
                 message="O contrato não possui garantia registrada.",
                 recommended_action="Validar a obrigatoriedade e registrar a garantia contratual.",
                 analyzer_name=self.name,
-                metadata={
+                metadata_json={
                     "generated_at": datetime.utcnow().isoformat()
                 },
             )

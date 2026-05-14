@@ -66,7 +66,7 @@ class ContractExpirationAnalyzer(BaseAnalyzer):
                 message=f"O contrato {contract.contract_number} vence em {diff} dias ({vigencia_fim.strftime('%d/%m/%Y')}).",
                 recommended_action="Avaliar necessidade de renovação ou novo processo licitatório.",
                 analyzer_name=self.name,
-                metadata={"days_remaining": diff, "end_date": vigencia_fim_str}
+                metadata_json={"days_remaining": diff, "end_date": vigencia_fim_str}
             ))
 
         return candidates

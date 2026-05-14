@@ -99,7 +99,7 @@ export default function Contract360() {
             <div className="flex items-center gap-3 mb-1 flex-wrap">
               <h1 className="text-xl font-bold text-foreground">{resumo?.numero || "—"}</h1>
               <StatusBadge status={resumo?.situacao_real} />
-              <CriticalityBadge criticality={riscos?.nivel === 'crítico' ? 'critical' : riscos?.nivel === 'alto' ? 'urgent' : 'low'} />
+              <CriticalityBadge criticality={riscos?.criticidade === 'estratégica' ? 'critical' : riscos?.criticidade === 'alta' ? 'urgent' : riscos?.criticidade === 'média' ? 'medium' : 'low'} />
             </div>
             <p
               className="
@@ -118,9 +118,9 @@ export default function Contract360() {
             <div className="text-center px-2">
               <div className={cn(
                 "text-2xl font-bold tabular-nums", 
-                (riscos?.saude || 0) >= 70 ? 'text-emerald-500' : (riscos?.saude || 0) >= 40 ? 'text-amber-400' : 'text-red-500'
+                (riscos?.saude_score || 0) >= 70 ? 'text-emerald-500' : (riscos?.saude_score || 0) >= 40 ? 'text-amber-400' : 'text-red-500'
               )}>
-                {riscos?.saude || 0}
+                {riscos?.saude_score || 0}
               </div>
               <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Saúde</div>
             </div>
@@ -146,7 +146,7 @@ export default function Contract360() {
         <InfoCard icon={DollarSign} label="Valor Global" value={formatarMoedaBR(resumo?.valor_global)} />
         <InfoCard icon={Calendar} label="Vigência" value={`${formatarDataBR(resumo?.inicio_vigencia)} → ${formatarDataBR(resumo?.vencimento)}`}/>
         <InfoCard icon={Scale} label="Modalidade" value={resumo?.modalidade || "—"}/>
-        <InfoCard icon={Shield}    label="Risco"      value={`${riscos?.score || 0}/100`} />
+        <InfoCard icon={Shield}    label="Risco"      value={`${riscos?.risco_score || 0}/100`} />
         <InfoCard icon={Calendar}  label="Última Sinc" value={formatarDataHoraBR(metadata?.last_sync)} />
       </div>
 
@@ -208,9 +208,9 @@ export default function Contract360() {
                 <Shield className="w-4 h-4 text-primary" /> Análise de Risco Consolidada
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <RiskFactorCard label="Score Global" value={`${riscos?.score || 0}/100`} />
-                <RiskFactorCard label="Nível de Risco" value={riscos?.nivel || "—"} />
-                <RiskFactorCard label="Saúde Contratual" value={`${riscos?.saude || 0}%`} />
+                <RiskFactorCard label="Score Global" value={`${riscos?.risco_score || 0}/100`} />
+                <RiskFactorCard label="Nível de Risco" value={riscos?.risco_nivel || "—"} />
+                <RiskFactorCard label="Saúde Contratual" value={`${riscos?.saude_score || 0}%`} />
                 <RiskFactorCard label="Progresso Temporal" value={`${(execucao?.percentual_tempo || 0).toFixed(1)}%`} />
               </div>
               

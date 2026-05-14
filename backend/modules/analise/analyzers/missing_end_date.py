@@ -42,7 +42,7 @@ class MissingEndDateAnalyzer(BaseAnalyzer):
                 message=f"O contrato {contract.contract_number} não possui vigência final cadastrada.",
                 recommended_action="Validar e atualizar a vigência contratual.",
                 analyzer_name=self.name,
-                metadata={
+                metadata_json={
                     "missing_field": "vigencia_fim"
                 }
             )

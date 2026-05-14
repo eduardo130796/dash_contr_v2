@@ -33,7 +33,7 @@ class SyncFailureAnalyzer(BaseAnalyzer):
                 message=f"Não foi possível sincronizar os seguintes dados do contrato: {', '.join(failed_endpoints)}.",
                 recommended_action="Verificar estabilidade da API do Comprasnet ou credenciais de acesso.",
                 analyzer_name=self.name,
-                metadata={"failed_endpoints": failed_endpoints}
+                metadata_json={"failed_endpoints": failed_endpoints}
             ))
 
         return candidates

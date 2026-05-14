@@ -5,6 +5,7 @@ import { getDaysRemaining, formatCompactCurrency } from '@/lib/contractUtils';
 import { CriticalityBadge } from '@/components/shared/StatusBadge';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ptBR } from 'date-fns/locale';
 
 export default function ExpirationTimeline({ data: backendTimeline }) {
   const { contracts } = useData();
@@ -44,15 +45,15 @@ export default function ExpirationTimeline({ data: backendTimeline }) {
           const days = c.days_remaining ?? 0;
           const dateStr = c.expiration_date || c.end_date;
           return (
-            <Link 
-              key={c.contract_number + i} 
+            <Link
+              key={c.contract_number + i}
               to={c.contract_id ? `/contract/${c.contract_id}` : '/contracts'}
               className="flex items-center gap-3 py-3 border-b border-border/50 last:border-0 hover:bg-accent/20 transition-all group px-2 -mx-2 rounded-md"
             >
               {/* Esquerda: Destaque de Prazo */}
               <div className="w-12 text-center shrink-0">
                 <div className={cn(
-                  "text-xl font-black tabular-nums leading-none", 
+                  "text-xl font-black tabular-nums leading-none",
                   days <= 30 ? 'text-red-500' : days <= 60 ? 'text-orange-500' : 'text-amber-500'
                 )}>
                   {days}
@@ -68,7 +69,7 @@ export default function ExpirationTimeline({ data: backendTimeline }) {
                   <span className="text-[10px] font-mono font-bold text-primary tracking-tighter">{c.contract_number}</span>
                   <CriticalityBadge criticality={c.criticality} className="h-3.5 text-[8px] px-1" />
                 </div>
-                <h4 
+                <h4
                   className="text-xs font-bold text-foreground truncate leading-tight first-letter:uppercase lowercase"
                   title={c.contract_object || c.object}
                 >
@@ -82,7 +83,9 @@ export default function ExpirationTimeline({ data: backendTimeline }) {
                   {dateStr ? format(parseISO(dateStr), 'dd') : '—'}
                 </div>
                 <div className="text-[9px] font-bold text-muted-foreground uppercase leading-none">
-                  {dateStr ? format(parseISO(dateStr), 'MMM') : '—'}
+                  {dateStr
+                    ? format(parseISO(dateStr), 'MMM', { locale: ptBR }).toUpperCase()
+                    : '—'}
                 </div>
               </div>
             </Link>

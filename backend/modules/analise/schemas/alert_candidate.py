@@ -11,7 +11,7 @@ class AlertCandidate(BaseModel):
     title: str
     message: str
     recommended_action: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata_json: Dict[str, Any] = Field(default_factory=dict)
     
     # Campo para rastreabilidade interna da engine
     analyzer_name: Optional[str] = None

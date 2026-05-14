@@ -6,10 +6,10 @@ import ExpirationChart from '@/components/cockpit/ExpirationChart';
 import CriticalityDistribution from '@/components/cockpit/CriticalityDistribution';
 import ActionRequired from '@/components/cockpit/ActionRequired';
 import InsightCards from '@/components/cockpit/InsightCards';
-import ContractsByUnit from '@/components/cockpit/ContractsByUnit';
+import ClosurePendingCard from '@/components/cockpit/ClosurePendingCard';
 import ExpirationTimeline from '@/components/cockpit/ExpirationTimeline';
-import { 
-  FileText, AlertTriangle, Clock, Shield, Crosshair, 
+import {
+  FileText, AlertTriangle, Clock, Shield, Crosshair,
   DollarSign, Bell
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -31,14 +31,13 @@ export default function ExecutiveCockpit() {
   const stats = dashboardData.kpis || {};
   const criticidadeBruta =
     dashboardData.criticality_distribution ?? dashboardData.criticalityDistribution;
-  
+
   if (dataLoading || isLoadingDashboard) return <LoadingOverlay message="Carregando plataforma de inteligência contratual…" />;
   if (dataError) return <ErrorState message={dataError} />;
 
   // Dados adicionais para os subcomponentes
   const urgentActions = dashboardData.urgent_actions || [];
   const executiveInsights = dashboardData.executive_insights || [];
-  const unitsData = dashboardData.contracts_by_unit || [];
   const timelineData = dashboardData.expiration_timeline || [];
   const expirationChartData = dashboardData.expirationTimeline || [];
 
@@ -72,31 +71,31 @@ export default function ExecutiveCockpit() {
         <KPICard title="Vencendo em 30d" value={stats.expiring30} icon={Clock} variant="danger" />
         <KPICard title="Vencendo em 60d" value={stats.expiring60} icon={Clock} variant="warning" />
         <KPICard title="Vencendo em 90d" value={stats.expiring90} icon={Clock} />
-        <KPICard title="Críticos" value={stats.critical} icon={AlertTriangle} variant="danger" />
-        <KPICard title="Estratégicos" value={stats.strategic} icon={Crosshair} variant="primary" />
+        <KPICard title="Alta Criticidade" value={stats.alta} icon={AlertTriangle} variant="danger" />
+        <KPICard title="Estratégicos" value={stats.estrategica} icon={Crosshair} variant="primary" />
         <KPICard title="Alertas Ativos" value={stats.activeAlerts} icon={Bell} variant="warning" />
       </div>
 
       {/* Portfolio Value */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <KPICard 
-          title="Valor Total do Portfólio" 
-          value={formatCompactCurrency(stats.totalValue)} 
-          icon={DollarSign} 
+        <KPICard
+          title="Valor Total do Portfólio"
+          value={formatCompactCurrency(stats.totalValue)}
+          icon={DollarSign}
           subtitle="Soma de todos os contratos ativos"
           variant="primary"
         />
-        <KPICard 
-          title="Ações Urgentes" 
-          value={stats.urgent} 
-          icon={Shield} 
+        <KPICard
+          title="Ações Urgentes"
+          value={urgentActions.length || stats.media}
+          icon={Shield}
           subtitle="Requerem decisão executiva imediata"
           variant="danger"
         />
-        <KPICard 
-          title="Alertas Vermelhos" 
-          value={stats.redAlerts} 
-          icon={AlertTriangle} 
+        <KPICard
+          title="Alertas Vermelhos"
+          value={stats.redAlerts}
+          icon={AlertTriangle}
           subtitle="Alertas de máxima severidade ativos"
           variant="danger"
         />
@@ -112,7 +111,7 @@ export default function ExecutiveCockpit() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <ActionRequired actions={urgentActions} />
         <InsightCards insights={executiveInsights} />
-        <ContractsByUnit data={unitsData} />
+        <ClosurePendingCard data={dashboardData.closure_pending} />
       </div>
 
       {/* Timeline */}

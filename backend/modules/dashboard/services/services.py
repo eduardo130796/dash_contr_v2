@@ -1,3 +1,4 @@
+from backend import update_schema
 from datetime import date, timedelta, timezone, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -65,11 +66,10 @@ class DashboardService:
         expiring60 = 0
         expiring90 = 0
         expiring180 = 0
-        critical = 0
-        urgent = 0
-        attention = 0
-        low = 0
-        strategic = 0
+        alta = 0
+        media = 0
+        baixa = 0
+        estrategica = 0
         total_value = 0.0
         average_risk_sum = 0
         high_risk_count = 0
@@ -111,31 +111,16 @@ class DashboardService:
                     expiring180 += 1
 
             # ── Criticidade ────────────────────────────────────────────────────
-            # Fonte primária: campo `analysis.criticality` (calculado pelo engine)
-            # Fonte fallback: risk_score via regras do mockData (compatibilidade)
-            criticality = (
-                analysis.get("criticality")
-                or self._derive_criticality_from_risk(
-                    analysis.get("risk_score") or raw.get("risk_score")
-                )
-            )
-            if criticality == "urgent":
-                urgent += 1
-            elif criticality == "critical":
-                critical += 1
-            elif criticality == "attention":
-                attention += 1
+            # Fonte primária: campo `analysis.criticidade`
+            criticality = analysis.get("criticidade") or "baixa"
+            if criticality == "alta":
+                alta += 1
+            elif criticality == "estratégica" or criticality == "estrategica":
+                estrategica += 1
+            elif criticality == "média" or criticality == "media":
+                media += 1
             else:
-                low += 1
-
-            # ── Estratégico ────────────────────────────────────────────────────
-            is_strategic = (
-                analysis.get("is_strategic")
-                or raw.get("is_strategic")
-                or False
-            )
-            if is_strategic:
-                strategic += 1
+                baixa += 1
 
             # ── Valor financeiro ───────────────────────────────────────────────
             # Ordem de precedência: valor_global > valor_inicial > 0
@@ -181,11 +166,10 @@ class DashboardService:
             expiring60=expiring60,
             expiring90=expiring90,
             expiring180=expiring180,
-            critical=critical,
-            urgent=urgent,
-            attention=attention,
-            low=low,
-            strategic=strategic,
+            estrategica=estrategica,
+            alta=alta,
+            media=media,
+            baixa=baixa,
             totalValue=total_value,
             activeAlerts=active_alerts,
             redAlerts=red_alerts,
@@ -201,16 +185,22 @@ class DashboardService:
             urgent_actions = []
 
         try:
-            executive_insights = self._generate_executive_insights(kpis, rows)
+            executive_insights = await self._generate_executive_insights(kpis, rows)
         except Exception:
             log.exception("Erro ao gerar insights executivos para o dashboard")
             executive_insights = []
 
         try:
-            units_aggregation, expiration_detail = self._process_units_and_timeline(rows, today)
+            closure_pending = await self._process_closure_pending()
+            _, expiration_detail = self._process_units_and_timeline(rows, today)
+
         except Exception:
-            log.exception("Erro ao processar unidades e timeline para o dashboard")
-            units_aggregation, expiration_detail = [], []
+            log.exception("Erro ao processar pendências de encerramento")
+            closure_pending = {
+                "total": 0,
+                "critical": 0,
+            }
+            expiration_detail = []
 
         log.info(
             "Stats calculados",
@@ -224,7 +214,7 @@ class DashboardService:
             expirationTimeline=timeline_sorted,
             urgent_actions=urgent_actions,
             executive_insights=executive_insights,
-            contracts_by_unit=units_aggregation,
+            closure_pending=closure_pending,
             expiration_timeline=expiration_detail
         )
 
@@ -235,20 +225,25 @@ class DashboardService:
             from sqlalchemy import desc
 
             # Prioridades que consideramos "urgentes" para o cockpit
+            URGENT_ACTION_TYPES = {
+                "contract_expiration",
+                "guarantee_expiration",
+            }
+
             stmt = (
                 select(Alerta, Contrato.contract_number, Contrato.raw_contract)
                 .join(Contrato, Alerta.contract_id == Contrato.id)
                 .where(Alerta.status == "active")
-                .where(Alerta.priority.in_(["immediate", "high"]))
+                .where(Alerta.type.in_(URGENT_ACTION_TYPES))
                 .order_by(
                     case(
-                        (Alerta.priority == "immediate", 1),
-                        (Alerta.priority == "high", 2),
+                        (Alerta.severity == "critical", 1),
+                        (Alerta.severity == "high", 2),
                         else_=3
                     ),
                     desc(Alerta.created_at)
                 )
-                .limit(6)
+                .limit(12)
             )
             result = await self.session.execute(stmt)
             actions = []
@@ -265,14 +260,61 @@ class DashboardService:
                     "recommended_action": alert.recommended_action,
                     "days_remaining": None
                 })
-            return actions
+            grouped = {}
+
+            for action in actions:
+
+                key = action.get("title")
+
+                if key not in grouped:
+                    grouped[key] = []
+
+                grouped[key].append(action)
+
+            curated = []
+
+            for group in grouped.values():
+                curated.extend(group[:2])
+
+            return curated[:6]
+            
         except Exception as e:
             log.error(f"Erro ao buscar ações urgentes: {e}")
             return []
 
-    def _generate_executive_insights(self, kpis: DashboardKPIs, rows: list) -> list:
+    async def _generate_executive_insights(self, kpis: DashboardKPIs, rows: list) -> list:
         """Gera insights estratégicos baseados nos dados atuais."""
+        from backend.modules.alertas.models.models import Alerta
         insights = []
+        missing_guarantee = 0
+        missing_responsible = 0
+        missing_closure = 0
+
+        active_alerts = []
+
+        try:
+
+            result = await self.session.execute(
+                select(Alerta).where(
+                    Alerta.status == "active"
+                )
+            )
+
+            active_alerts = result.scalars().all()
+
+        except Exception:
+            pass
+
+        for alert in active_alerts:
+
+            if alert.type == "missing_guarantee":
+                missing_guarantee += 1
+
+            elif alert.type == "missing_responsible":
+                missing_responsible += 1
+
+            elif alert.type == "missing_closure":
+                missing_closure += 1
 
         # Insight 1: Pico de vencimentos
         if kpis.expiring90 > 5:
@@ -314,6 +356,32 @@ class DashboardService:
                 "severity": "low"
             })
 
+
+        if missing_guarantee > 0:
+            insights.append({
+                "type": "missing_guarantee",
+                "title": "Garantias pendentes",
+                "description": f"{missing_guarantee} contratos sem garantia cadastrada.",
+                "severity": "medium"
+            })
+
+        if missing_responsible > 0:
+            insights.append({
+                "type": "missing_responsible",
+                "title": "Responsáveis ausentes",
+                "description": f"{missing_responsible} contratos sem responsável definido.",
+                "severity": "medium"
+            })
+
+        if missing_closure > 0:
+            insights.append({
+                "type": "missing_closure",
+                "title": "Pendências de encerramento",
+                "description": f"{missing_closure} contratos vencidos permanecem ativos.",
+                "severity": "high"
+            })
+
+    
         # Insight Default se não houver problemas
         if not insights:
             insights.append({
@@ -365,8 +433,8 @@ class DashboardService:
                         units[unit_name]["expiring"] += 1
 
             # Criticidade por Unidade
-            criticality = analysis.get("criticality")
-            if criticality in ("critical", "urgent"):
+            criticality = analysis.get("criticidade")
+            if criticality in ("alta", "estratégica", "estrategica"):
                 units[unit_name]["critical"] += 1
 
         # Formata Units
@@ -384,6 +452,48 @@ class DashboardService:
         timeline_sorted = sorted(timeline, key=lambda x: x["days_remaining"])[:15]
 
         return unit_aggs, timeline_sorted
+
+    async def _process_closure_pending(self) -> dict:
+
+        try:
+
+            from backend.modules.alertas.models.models import Alerta
+
+            result = await self.session.execute(
+                select(
+                    Alerta.severity
+                ).where(
+                    Alerta.status == "active",
+                    Alerta.type == "missing_closure",
+                )
+            )
+
+            rows = result.all()
+
+            total = len(rows)
+
+            critical = sum(
+                1
+                for row in rows
+                if row.severity in ["high", "critical"]
+            )
+
+            return {
+                "total": total,
+                "critical": critical,
+            }
+
+        except Exception:
+
+            log.exception(
+                "Erro ao calcular pendências de encerramento"
+            )
+
+            return {
+                "total": 0,
+                "critical": 0,
+            }
+
 
     # ──────────────────────────────────────────────────────────────────────────
     # Helpers privados

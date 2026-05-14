@@ -27,20 +27,16 @@ function buildDistributionRows(kpis, criticalityDistribution) {
     console.log('[CriticalityDistribution] criticality_distribution:', criticalityDistribution);
   }
 
-  const urgente =
-    toFiniteNumber(base.urgent ?? base.Urgent)
-    || toFiniteNumber(base.high ?? base.High);
-  const critico = toFiniteNumber(base.critical ?? base.Critical);
-  const atencao =
-    toFiniteNumber(base.attention ?? base.Attention)
-    || toFiniteNumber(base.medium ?? base.Medium);
-  const normal = toFiniteNumber(base.low ?? base.Low);
+  const estrategica = toFiniteNumber(base.estrategica);
+  const alta = toFiniteNumber(base.alta);
+  const media = toFiniteNumber(base.media);
+  const baixa = toFiniteNumber(base.baixa);
 
   return [
-    { nome: 'Urgente', quantidade: urgente, corKey: 'faixa1' },
-    { nome: 'Crítico', quantidade: critico, corKey: 'faixa2' },
-    { nome: 'Atenção', quantidade: atencao, corKey: 'faixa3' },
-    { nome: 'Normal', quantidade: normal, corKey: 'faixa4' },
+    { nome: 'Estratégica', quantidade: estrategica, corKey: 'faixa1' },
+    { nome: 'Alta', quantidade: alta, corKey: 'faixa2' },
+    { nome: 'Média', quantidade: media, corKey: 'faixa3' },
+    { nome: 'Baixa', quantidade: baixa, corKey: 'faixa4' },
   ];
 }
 
