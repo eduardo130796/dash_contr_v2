@@ -19,7 +19,7 @@ export default function ExpirationTimeline({ data: backendTimeline }) {
         days_remaining: item.days_remaining,
         severity: item.severity,
         expiration_date: item.expiration_date,
-        criticality: item.severity === 'critical' ? 'urgent' : item.severity === 'high' ? 'critical' : 'attention',
+        criticality: item.priority,
         object: item.contract_object || 'Objeto não informado'
       }));
     }

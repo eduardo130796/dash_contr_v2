@@ -193,7 +193,7 @@ class ContratoService:
         alertas = [
             AlertaSchema(
                 id=str(a.id),
-                tipo=a.category or "automatico",
+                tipo=a.type or "automatico",
                 titulo=a.title or "Alerta do Sistema",
                 descricao=a.message or "",
                 severidade=a.severity or "low",

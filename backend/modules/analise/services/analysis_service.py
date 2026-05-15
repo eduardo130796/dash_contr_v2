@@ -30,7 +30,7 @@ class AnalyzerExecutionResult(BaseModel):
 
 class AnalysisService:
     _lock = asyncio.Lock()
-    VERSION = "1.2.7"
+    VERSION = "1.5.0"
 
     def __init__(self, session: AsyncSession):
         self.session = session

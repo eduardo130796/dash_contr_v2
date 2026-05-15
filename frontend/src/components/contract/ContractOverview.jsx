@@ -1,5 +1,6 @@
 import ContractAlerts from "./ContractAlerts";
 import { getStatusLabel } from "@/utils/formatters";
+import { getHealthColor } from "@/lib/contractUtils";
 
 export default function ContractOverview({ resumo, riscos, alertas, aditivosCount, metadata }) {
   // Verificação de segurança inicial
@@ -13,7 +14,7 @@ export default function ContractOverview({ resumo, riscos, alertas, aditivosCoun
 
   // Cálculos simples permitidos para visualização
   const daysRemaining = resumo?.dias_restantes;
-  const healthScore = riscos?.saude || 0;
+  const healthScore = riscos?.saude_score || 0;
   const actions = metadata?.recommended_actions || [];
   
   return (
@@ -51,7 +52,7 @@ export default function ContractOverview({ resumo, riscos, alertas, aditivosCoun
                   <p className="text-muted-foreground uppercase font-bold tracking-tighter">Saúde</p>
                   <p className={cn(
                     "font-black text-sm tabular-nums",
-                    healthScore >= 70 ? 'text-emerald-500' : healthScore >= 40 ? 'text-amber-500' : 'text-red-500'
+                    getHealthColor(healthScore)
                   )}>{healthScore}%</p>
                 </div>
 

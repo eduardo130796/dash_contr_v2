@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, func
+from sqlalchemy import Column, String, Boolean, DateTime, Date, func
 from sqlalchemy.dialects.postgresql import JSONB
 from backend.core.database.database import Base
 
@@ -10,6 +10,10 @@ class Contrato(Base):
     contract_number = Column(String, index=True)
     is_active = Column(Boolean, default=True)
     status = Column(String)
+
+    # ── Colunas Operacionais Indexáveis (projeção do JSONB) ──────────────────
+    # Primeira coluna operacional: vigência final para filtros eficientes no PG
+    vigencia_fim = Column(Date, nullable=True, index=True)
 
     # Hashes por domínio (sincronização granular)
     main_hash = Column(String)

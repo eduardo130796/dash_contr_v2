@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useData } from '@/lib/DataContext';
 import { formatarDataBR, formatarDataHoraBR, formatarMoedaBR, getStatusLabel } from '@/utils/formatters';
+import { getHealthColor, getRiskColor, getRiskBgColor } from '@/lib/contractUtils';
 import { StatusBadge, CriticalityBadge } from '@/components/shared/StatusBadge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -99,7 +100,7 @@ export default function Contract360() {
             <div className="flex items-center gap-3 mb-1 flex-wrap">
               <h1 className="text-xl font-bold text-foreground">{resumo?.numero || "—"}</h1>
               <StatusBadge status={resumo?.situacao_real} />
-              <CriticalityBadge criticality={riscos?.criticidade === 'estratégica' ? 'critical' : riscos?.criticidade === 'alta' ? 'urgent' : riscos?.criticidade === 'média' ? 'medium' : 'low'} />
+              <CriticalityBadge criticality={riscos?.criticidade} />
             </div>
             <p
               className="
@@ -118,7 +119,7 @@ export default function Contract360() {
             <div className="text-center px-2">
               <div className={cn(
                 "text-2xl font-bold tabular-nums", 
-                (riscos?.saude_score || 0) >= 70 ? 'text-emerald-500' : (riscos?.saude_score || 0) >= 40 ? 'text-amber-400' : 'text-red-500'
+                getHealthColor(riscos?.saude_score || 0)
               )}>
                 {riscos?.saude_score || 0}
               </div>
@@ -208,9 +209,9 @@ export default function Contract360() {
                 <Shield className="w-4 h-4 text-primary" /> Análise de Risco Consolidada
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <RiskFactorCard label="Score Global" value={`${riscos?.risco_score || 0}/100`} />
-                <RiskFactorCard label="Nível de Risco" value={riscos?.risco_nivel || "—"} />
-                <RiskFactorCard label="Saúde Contratual" value={`${riscos?.saude_score || 0}%`} />
+                <RiskFactorCard label="Score Global" value={`${riscos?.risco_score || 0}/100`} score={riscos?.risco_score} />
+                <RiskFactorCard label="Nível de Risco" value={riscos?.risco_nivel || "—"} score={riscos?.risco_score} />
+                <RiskFactorCard label="Saúde Contratual" value={`${riscos?.saude_score || 0}%`} score={100 - (riscos?.saude_score || 0)} />
                 <RiskFactorCard label="Progresso Temporal" value={`${(execucao?.percentual_tempo || 0).toFixed(1)}%`} />
               </div>
               
@@ -286,15 +287,17 @@ function InfoCard({ icon: Icon, label, value }) {
   );
 }
 
-function RiskFactorCard({ label, value }) {
-  const isHigh = ['crítico', 'alto', 'crítico/100', 'alto/100'].some(v => String(value).toLowerCase().includes(v));
+function RiskFactorCard({ label, value, score }) {
+  const riskColor = getRiskColor(score || 0);
+  const isHigh = score >= 45;
+  
   return (
     <div className={cn(
       "p-4 rounded-xl border transition-all", 
       isHigh ? 'bg-red-500/5 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.05)]' : 'bg-accent/20 border-border'
     )}>
       <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-1">{label}</p>
-      <p className={cn("text-lg font-bold tabular-nums", isHigh ? 'text-red-500' : 'text-foreground')}>{value}</p>
+      <p className={cn("text-lg font-bold tabular-nums", riskColor)}>{value}</p>
     </div>
   );
 }

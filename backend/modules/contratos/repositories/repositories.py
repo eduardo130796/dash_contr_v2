@@ -279,7 +279,8 @@ class ContratoRepository:
         elif sort_by == "fornecedor":
             sort_attr = Contrato.raw_contract["fornecedor"]["nome"].astext
         else:
-            sort_attr = Contrato.raw_contract["vigencia_fim"].astext
+            # Usa a coluna física indexável para ordenação eficiente no PG
+            sort_attr = Contrato.vigencia_fim
 
         if order == "desc":
             query = query.order_by(desc(sort_attr))

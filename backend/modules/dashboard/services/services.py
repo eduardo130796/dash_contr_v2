@@ -66,10 +66,10 @@ class DashboardService:
         expiring60 = 0
         expiring90 = 0
         expiring180 = 0
-        alta = 0
-        media = 0
-        baixa = 0
-        estrategica = 0
+        critica = 0
+        urgente = 0
+        atencao = 0
+        normal = 0
         total_value = 0.0
         average_risk_sum = 0
         high_risk_count = 0
@@ -110,17 +110,17 @@ class DashboardService:
                 if days_remaining <= 180:
                     expiring180 += 1
 
-            # ── Criticidade ────────────────────────────────────────────────────
+            # ── Criticidade Operacional ─────────────────────────────────────────
             # Fonte primária: campo `analysis.criticidade`
-            criticality = analysis.get("criticidade") or "baixa"
-            if criticality == "alta":
-                alta += 1
-            elif criticality == "estratégica" or criticality == "estrategica":
-                estrategica += 1
-            elif criticality == "média" or criticality == "media":
-                media += 1
+            criticality = analysis.get("criticidade") or "normal"
+            if criticality == "crítica":
+                critica += 1
+            elif criticality == "urgente":
+                urgente += 1
+            elif criticality == "atenção":
+                atencao += 1
             else:
-                baixa += 1
+                normal += 1
 
             # ── Valor financeiro ───────────────────────────────────────────────
             # Ordem de precedência: valor_global > valor_inicial > 0
@@ -166,10 +166,10 @@ class DashboardService:
             expiring60=expiring60,
             expiring90=expiring90,
             expiring180=expiring180,
-            estrategica=estrategica,
-            alta=alta,
-            media=media,
-            baixa=baixa,
+            critica=critica,
+            urgente=urgente,
+            atencao=atencao,
+            normal=normal,
             totalValue=total_value,
             activeAlerts=active_alerts,
             redAlerts=red_alerts,
@@ -417,7 +417,7 @@ class DashboardService:
             if counts_in_expiration_views(row.status, vigencia_fim, today):
                 days = (vigencia_fim - today).days
                 if 0 <= days <= 180:
-                    severity = "critical" if days <= 30 else "high" if days <= 60 else "medium"
+                    priority = self._calculate_priority(days)
                     obj = raw.get("objeto") or "Objeto não informado"
                     
                     timeline.append({
@@ -425,7 +425,7 @@ class DashboardService:
                         "contract_number": raw.get("numero") or "S/N",
                         "contract_object": obj[:100] + ("..." if len(obj) > 100 else ""),
                         "days_remaining": days,
-                        "severity": severity,
+                        "priority": priority,
                         "expiration_date": vigencia_fim.isoformat()
                     })
                     
@@ -434,7 +434,7 @@ class DashboardService:
 
             # Criticidade por Unidade
             criticality = analysis.get("criticidade")
-            if criticality in ("alta", "estratégica", "estrategica"):
+            if criticality in ("crítica", "urgente"):
                 units[unit_name]["critical"] += 1
 
         # Formata Units
@@ -542,6 +542,13 @@ class DashboardService:
         if score >= 30:
             return "attention"
         return "low"
+
+    def _calculate_priority(self, days: int) -> str:
+        """Determina a prioridade operacional baseada em dias para o vencimento."""
+        if days <= 7: return "crítica"
+        if days <= 15: return "urgente"
+        if days <= 30: return "atenção"
+        return "normal"
 
     async def _count_alerts(self) -> tuple[int, int]:
         """

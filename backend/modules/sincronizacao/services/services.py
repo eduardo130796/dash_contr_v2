@@ -12,6 +12,7 @@ from backend.modules.contratos.models.models import Contrato
 from backend.modules.contratos.repositories.repositories import ContratoRepository
 from backend.modules.sincronizacao.models.models import SyncExecution
 from backend.core.exceptions.exceptions import BusinessException
+from backend.modules.contratos.domain.vigencia_utils import parse_vigencia_fim
 
 # Proteção global contra concorrência para contratos específicos
 _sync_locks: dict[str, asyncio.Lock] = {}
@@ -41,18 +42,22 @@ class SincronizacaoService:
         return hashlib.sha256(serialized.encode('utf-8')).hexdigest()
 
     def _verificar_vigencia(self, data_fim_str: str | None) -> tuple[bool, str]:
+        """
+        Determina se o contrato está ativo com base na data de vigência.
+        Usa parse_vigencia_fim (helper centralizado) para suportar dd/mm/yyyy e yyyy-mm-dd.
+        """
         if not data_fim_str:
             return True, "vigencia_indefinida"
-        try:
-            data_fim = datetime.strptime(data_fim_str[:10], "%Y-%m-%d").date()
-            hoje = datetime.now(timezone.utc).date()
-            if data_fim >= hoje:
-                return True, "ativo"
-            else:
-                return False, "vencido"
-        except Exception as e:
-            log.warning("Erro ao fazer parse da data de vigencia", data=data_fim_str, erro=str(e))
+        # Usa o helper centralizado para suportar ambos os formatos da API
+        data_fim = parse_vigencia_fim({"vigencia_fim": data_fim_str})
+        if data_fim is None:
+            log.warning("Não foi possível converter data de vigencia", data=data_fim_str)
             return True, "vigencia_indefinida"
+        hoje = datetime.now(timezone.utc).date()
+        if data_fim >= hoje:
+            return True, "ativo"
+        else:
+            return False, "vencido"
 
     def _extrair_campos_principais(self, item: dict) -> tuple[str, str, str | None]:
         external_id = str(item.get("id"))
@@ -180,6 +185,8 @@ class SincronizacaoService:
                 status=status,
                 main_hash=main_hash,
                 raw_contract=item,
+                # ── Coluna operacional: projeção indexável da vigência final ──
+                vigencia_fim=parse_vigencia_fim(item),
                 last_sync_at=datetime.now(timezone.utc),
                 last_main_update_at=datetime.now(timezone.utc)
             )
@@ -191,13 +198,15 @@ class SincronizacaoService:
                 contrato.status = status
                 contrato.is_active = is_active
                 atualizar_banco = True
-                
+
             if contrato.main_hash != main_hash:
                 contrato.main_hash = main_hash
                 contrato.raw_contract = item
                 contrato.last_main_update_at = datetime.now(timezone.utc)
+                # ── Sincronizar coluna operacional ao atualizar o raw_contract ──
+                contrato.vigencia_fim = parse_vigencia_fim(item)
                 atualizar_banco = True
-                
+
             if atualizar_banco:
                 contrato.last_sync_at = datetime.now(timezone.utc)
                 await self.repo.update(contrato)

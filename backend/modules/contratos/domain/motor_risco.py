@@ -1,19 +1,23 @@
 from enum import Enum
-from typing import List, Dict, Any, Optional
+from typing import List, Any
+
 from pydantic import BaseModel
 
+
 class NivelSaude(str, Enum):
-    EXCELENTE = "excelente"
-    ESTAVEL = "estável"
+    SAUDAVEL = "saudável"
     ATENCAO = "atenção"
-    CRITICO = "crítico"
+    COMPROMETIDA = "comprometida"
+    CRITICA = "crítica"
     COLAPSO = "colapso"
 
+
 class NivelCriticidade(str, Enum):
-    BAIXA = "baixa"
-    MEDIA = "média"
-    ALTA = "alta"
-    ESTRATEGICA = "estratégica"
+    NORMAL = "normal"
+    ATENCAO = "atenção"
+    URGENTE = "urgente"
+    CRITICA = "crítica"
+
 
 class NivelRisco(str, Enum):
     BAIXO = "baixo"
@@ -21,10 +25,12 @@ class NivelRisco(str, Enum):
     ALTO = "alto"
     CRITICO = "crítico"
 
+
 class FatorRisco(BaseModel):
     tipo: str
     impacto: int
     descricao: str
+
 
 class ResumoOperacional(BaseModel):
     possui_alertas_criticos: bool
@@ -32,106 +38,207 @@ class ResumoOperacional(BaseModel):
     sync_ok: bool
     compliance_ok: bool
 
+
 class AnalysisResult(BaseModel):
     saude_score: int
     saude_nivel: str
-    criticidade: str
+
     risco_score: int
     risco_nivel: str
+
+    criticidade: str
+
     fatores: List[FatorRisco]
     resumo_operacional: ResumoOperacional
 
+
 class MotorRisco:
-    # Mapeamento do tipo de alerta para impacto negativo na saúde
+
     PENALIZACOES = {
-        "missing_guarantee": {"impacto": -20, "descricao": "Garantia ausente"},
-        "guarantee_expiration": {"impacto": -10, "descricao": "Garantia vencendo/vencida"},
-        "missing_responsible": {"impacto": -15, "descricao": "Responsável ausente"},
-        "contract_expiration": {"impacto": -15, "descricao": "Contrato próximo ao vencimento"},
-        "contract_expired": {"impacto": -35, "descricao": "Contrato vencido"}, # Caso tenhamos uma distinção no futuro
-        "missing_closure": {"impacto": -20, "descricao": "Encerramento pendente"},
-        "sync_failure": {"impacto": -8, "descricao": "Falha na sincronização"}
+        "missing_guarantee": {
+            "impacto": -15,
+            "descricao": "Garantia ausente"
+        },
+
+        "guarantee_expiration": {
+            "impacto": -8,
+            "descricao": "Garantia vencendo/vencida"
+        },
+
+        "missing_responsible": {
+            "impacto": -10,
+            "descricao": "Responsável ausente"
+        },
+
+        "contract_expiration": {
+            "impacto": -10,
+            "descricao": "Contrato próximo ao vencimento"
+        },
+
+        "contract_expired": {
+            "impacto": -25,
+            "descricao": "Contrato vencido"
+        },
+
+        "missing_closure": {
+            "impacto": -12,
+            "descricao": "Encerramento pendente"
+        },
+
+        "sync_failure": {
+            "impacto": -5,
+            "descricao": "Falha na sincronização"
+        }
     }
 
     @classmethod
-    def calcular(cls, contrato: Any, alertas: List[Any]) -> AnalysisResult:
-        """
-        Calcula os scores e níveis baseados nos alertas ativos de um contrato.
-        Assume que o objeto `contrato` tem propriedades básicas e `alertas` são
-        instâncias do banco ou schemas.
-        """
+    def calcular(
+        cls,
+        contrato: Any,
+        alertas: List[Any]
+    ) -> AnalysisResult:
+
         fatores: List[FatorRisco] = []
-        
+
         saude_score = 100
-        
-        # 1. Processar Alertas para Saúde e Fatores
+
+        # =========================================================
+        # PROCESSAMENTO DOS ALERTAS
+        # =========================================================
+
         for alerta in alertas:
-            tipo = alerta.tipo if hasattr(alerta, 'tipo') else alerta.get('tipo', '')
-            
-            # Ajuste de contrato vencido vs vencendo (se necessário baseado na severidade ou metadata)
-            # Vamos tratar apenas com o tipo para simplificar e seguir a regra de negócio
+
+            # Correção: O modelo Alerta usa o campo 'type', não 'tipo'
+            tipo = getattr(alerta, "type", "") or ""
+
             if tipo == "contract_expiration":
-                metadata = alerta.metadata_json if hasattr(alerta, 'metadata_json') else alerta.get('metadata_json', {})
-                days = metadata.get('days_to_expire', 999)
+
+                metadata = getattr(alerta, "metadata_json", {})
+
+                days = metadata.get("days_to_expire", 999)
+
                 if days < 0:
                     tipo_real = "contract_expired"
-                    impacto = -35
-                    descricao = "Contrato vencido"
+
+                    impacto = cls.PENALIZACOES[
+                        "contract_expired"
+                    ]["impacto"]
+
+                    descricao = cls.PENALIZACOES[
+                        "contract_expired"
+                    ]["descricao"]
+
                 else:
                     tipo_real = tipo
-                    impacto = cls.PENALIZACOES.get(tipo, {}).get("impacto", -10)
-                    descricao = "Contrato próximo ao vencimento"
+
+                    impacto = cls.PENALIZACOES[
+                        tipo
+                    ]["impacto"]
+
+                    descricao = cls.PENALIZACOES[
+                        tipo
+                    ]["descricao"]
+
             else:
+
                 tipo_real = tipo
-                regra = cls.PENALIZACOES.get(tipo, {})
-                impacto = regra.get("impacto", -5) # default -5 se não mapeado
-                descricao = regra.get("descricao", f"Alerta ativo: {tipo}")
-                
+
+                regra = cls.PENALIZACOES.get(tipo)
+
+                # ALERTAS DESCONHECIDOS NÃO PENALIZAM
+                if not regra:
+                    impacto = 0
+                    descricao = f"Alerta ativo: {tipo}"
+
+                else:
+                    impacto = regra["impacto"]
+                    descricao = regra["descricao"]
+
             saude_score += impacto
-            
-            fatores.append(FatorRisco(
-                tipo=tipo_real,
-                impacto=impacto,
-                descricao=descricao
-            ))
-            
+
+            fatores.append(
+                FatorRisco(
+                    tipo=tipo_real,
+                    impacto=impacto,
+                    descricao=descricao
+                )
+            )
+
+        # =========================================================
+        # NORMALIZAÇÃO
+        # =========================================================
+
         saude_score = max(0, min(100, saude_score))
+
+        # =========================================================
+        # SAÚDE
+        # =========================================================
+
+        saude_nivel = cls._determinar_nivel_saude(
+            saude_score
+        )
+
+        # =========================================================
+        # RISCO
+        # =========================================================
+
+        risco_score = 100 - saude_score
+
+        risco_score = max(
+            0,
+            min(100, risco_score)
+        )
+
+        risco_nivel = cls._determinar_nivel_risco(
+            risco_score
+        )
+
+        # =========================================================
+        # CRITICIDADE OPERACIONAL
+        # =========================================================
+
+        # =========================================================
+        # CRITICIDADE OPERACIONAL (SSOT DE PRIORIDADE)
+        # =========================================================
         
-        # 2. Definir Nível de Saúde
-        saude_nivel = cls._determinar_nivel_saude(saude_score)
-        
-        # 3. Determinar Criticidade (Mockada/Heurística por enquanto, se não houver no banco)
-        # Se houver um campo no contrato que defina, usamos ele.
-        # Por padrão, vamos fazer uma regra simples: valor alto = alta
-        criticidade = cls._determinar_criticidade(contrato)
-        
-        # 4. Calcular Risco Consolidado
-        # O Risco é o inverso da Saúde, ponderado pela Criticidade
-        risco_base = 100 - saude_score
-        multiplicador = {
-            NivelCriticidade.BAIXA: 0.8,
-            NivelCriticidade.MEDIA: 1.0,
-            NivelCriticidade.ALTA: 1.2,
-            NivelCriticidade.ESTRATEGICA: 1.5
-        }.get(criticidade, 1.0)
-        
-        risco_score = int(risco_base * multiplicador)
-        risco_score = max(0, min(100, risco_score))
-        
-        risco_nivel = cls._determinar_nivel_risco(risco_score)
-        
-        # 5. Resumo Operacional
-        # Determinar possivelmente baseado nos alertas
+        # Cálculo de dias para vencer (baseado na coluna física vigencia_fim)
+        dias_para_vencer = 999
+        if hasattr(contrato, "vigencia_fim") and contrato.vigencia_fim:
+            from datetime import date
+            dias_para_vencer = (contrato.vigencia_fim - date.today()).days
+
+        criticidade = cls._determinar_criticidade(
+            saude_score=saude_score,
+            risco_score=risco_score,
+            alertas=alertas,
+            dias_para_vencer=dias_para_vencer
+        )
+
+        # =========================================================
+        # RESUMO OPERACIONAL
+        # =========================================================
+
         possui_alertas_criticos = any(
-            (hasattr(a, 'severidade') and a.severidade == 'red') or 
-            (isinstance(a, dict) and a.get('severidade') == 'red') 
+            getattr(a, "severidade", "") == "red"
             for a in alertas
         )
-        sync_ok = not any(f.tipo == "sync_failure" for f in fatores)
-        
-        # compliance: ausência de responsáveis, garantias, etc.
-        compliance_tipos = ["missing_guarantee", "guarantee_expiration", "missing_responsible", "missing_closure"]
-        compliance_ok = not any(f.tipo in compliance_tipos for f in fatores)
+
+        sync_ok = not any(
+            f.tipo == "sync_failure"
+            for f in fatores
+        )
+
+        compliance_tipos = [
+            "missing_guarantee",
+            "guarantee_expiration",
+            "missing_responsible",
+            "missing_closure"
+        ]
+
+        compliance_ok = not any(
+            f.tipo in compliance_tipos
+            for f in fatores
+        )
 
         resumo_operacional = ResumoOperacional(
             possui_alertas_criticos=possui_alertas_criticos,
@@ -139,79 +246,107 @@ class MotorRisco:
             sync_ok=sync_ok,
             compliance_ok=compliance_ok
         )
-        
+
         return AnalysisResult(
             saude_score=saude_score,
             saude_nivel=saude_nivel.value,
-            criticidade=criticidade.value,
+
             risco_score=risco_score,
             risco_nivel=risco_nivel.value,
+
+            criticidade=criticidade.value,
+
             fatores=fatores,
+
             resumo_operacional=resumo_operacional
         )
-        
+
+    # =============================================================
+    # NÍVEIS DE SAÚDE
+    # =============================================================
+
     @staticmethod
-    def _determinar_nivel_saude(score: int) -> NivelSaude:
-        if score >= 90:
-            return NivelSaude.EXCELENTE
-        elif score >= 70:
-            return NivelSaude.ESTAVEL
-        elif score >= 50:
+    def _determinar_nivel_saude(
+        score: int
+    ) -> NivelSaude:
+
+        if score >= 85:
+            return NivelSaude.SAUDAVEL
+
+        elif score >= 65:
             return NivelSaude.ATENCAO
-        elif score >= 30:
-            return NivelSaude.CRITICO
-        else:
-            return NivelSaude.COLAPSO
-            
-    @staticmethod
-    def _determinar_criticidade(contrato: Any) -> NivelCriticidade:
-        # Tenta pegar a criticidade existente se estiver salva
-        if isinstance(contrato, dict):
-            c_str = contrato.get("criticidade")
-            valor = contrato.get("valor", 0)
-        else:
-            c_str = getattr(contrato, "criticidade", None)
-            
-            # Tentar achar o valor pelo json
-            valor = 0
-            raw_contract = getattr(contrato, "raw_contract", None)
-            if raw_contract and isinstance(raw_contract, dict):
-                raw_value = str(raw_contract.get("valor_global", 0))
 
-                valor = float(
-                    raw_value
-                    .replace(".", "")
-                    .replace(",", ".")
-                )
+        elif score >= 45:
+            return NivelSaude.COMPROMETIDA
 
-        if c_str and isinstance(c_str, str):
-            c_str = c_str.lower()
-            if "estrategic" in c_str or "estratégic" in c_str:
-                return NivelCriticidade.ESTRATEGICA
-            elif "alta" in c_str:
-                return NivelCriticidade.ALTA
-            elif "media" in c_str or "média" in c_str:
-                return NivelCriticidade.MEDIA
-            elif "baixa" in c_str:
-                return NivelCriticidade.BAIXA
+        elif score >= 20:
+            return NivelSaude.CRITICA
 
-        # Heurística se não houver explicitamente
-        if valor > 1000000:
-            return NivelCriticidade.ESTRATEGICA
-        elif valor > 500000:
-            return NivelCriticidade.ALTA
-        elif valor > 100000:
-            return NivelCriticidade.MEDIA
-        else:
-            return NivelCriticidade.BAIXA
+        return NivelSaude.COLAPSO
+
+    # =============================================================
+    # NÍVEIS DE RISCO
+    # =============================================================
 
     @staticmethod
-    def _determinar_nivel_risco(score: int) -> NivelRisco:
+    def _determinar_nivel_risco(
+        score: int
+    ) -> NivelRisco:
+
         if score >= 80:
             return NivelRisco.CRITICO
+
         elif score >= 60:
             return NivelRisco.ALTO
+
         elif score >= 30:
             return NivelRisco.MODERADO
-        else:
-            return NivelRisco.BAIXO
+
+        return NivelRisco.BAIXO
+
+    # =============================================================
+    # CRITICIDADE OPERACIONAL
+    # =============================================================
+
+    @staticmethod
+    def _determinar_criticidade(
+        saude_score: int,
+        risco_score: int,
+        alertas: List[Any],
+        dias_para_vencer: int
+    ) -> NivelCriticidade:
+        """
+        Lógica Híbrida: Prioriza urgência temporal e alertas críticos 
+        sobre o score técnico de saúde.
+        """
+        
+        alertas_criticos = sum(
+            1
+            for alerta in alertas
+            if getattr(alerta, "severidade", "") == "red"
+        )
+        
+        total_alertas = len(alertas)
+
+        # 1. PRECEDÊNCIA TEMPORAL (Urgência Máxima)
+        if dias_para_vencer <= 7:
+            return NivelCriticidade.CRITICA
+            
+        if dias_para_vencer <= 15:
+            return NivelCriticidade.URGENTE
+            
+        if dias_para_vencer <= 30:
+            return NivelCriticidade.ATENCAO
+
+        # 2. SEVERIDADE DE ALERTAS
+        if alertas_criticos >= 3 or saude_score <= 20:
+            return NivelCriticidade.CRITICA
+            
+        if alertas_criticos >= 2 or saude_score <= 45:
+            return NivelCriticidade.URGENTE
+            
+        if alertas_criticos >= 1 or total_alertas >= 3 or saude_score <= 70:
+            return NivelCriticidade.ATENCAO
+
+        # 3. PADRÃO
+        return NivelCriticidade.NORMAL

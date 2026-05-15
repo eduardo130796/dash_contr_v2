@@ -26,18 +26,18 @@ class DashboardKPIs(BaseModel):
     expiring180: int
     """Contratos ativos com vencimento em até 180 dias."""
 
-    # Criticidade
-    estrategica: int
-    """Contratos marcados como estratégicos."""
+    # Criticidade Operacional
+    critica: int
+    """Contratos com criticidade 'crítica'."""
 
-    alta: int
-    """Contratos com criticidade 'alta'."""
+    urgente: int
+    """Contratos com criticidade 'urgente'."""
 
-    media: int
-    """Contratos com criticidade 'média'."""
+    atencao: int
+    """Contratos com criticidade 'atenção'."""
 
-    baixa: int
-    """Contratos com criticidade 'baixa'."""
+    normal: int
+    """Contratos com criticidade 'normal'."""
 
     # Valor financeiro
     totalValue: float
@@ -94,7 +94,7 @@ class ExpirationTimelineDetail(BaseModel):
     contract_number: str
     contract_object: str | None
     days_remaining: int
-    severity: str
+    priority: str
     expiration_date: str
 
 class ClosurePendingSummary(BaseModel):

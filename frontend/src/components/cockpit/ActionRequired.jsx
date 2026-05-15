@@ -43,13 +43,13 @@ export default function ActionRequired({ actions: propActions }) {
           alerts.map(alert => {
             // Mapeamento de Severity Backend -> Criticality UI
             const severityMap = {
-              critical: 'urgent',
-              high: 'critical',
-              medium: 'attention',
-              low: 'low',
-              info: 'low'
+              critical: 'crítica',
+              high: 'urgente',
+              medium: 'atenção',
+              low: 'normal',
+              info: 'normal'
             };
-            const uiCriticality = severityMap[alert.severity] || 'low';
+            const uiCriticality = severityMap[alert.severity] || 'normal';
             
             return (
               <Link

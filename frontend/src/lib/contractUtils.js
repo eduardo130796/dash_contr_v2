@@ -53,12 +53,12 @@ export function getSeverityBg(severity) {
 
 export function getCriticalityConfig(criticality) {
   const configs = {
-    low: { label: 'Normal', color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/20', dot: 'bg-emerald-500' },
-    attention: { label: 'Atenção', color: 'text-amber-400', bg: 'bg-amber-400/10 border-amber-400/20', dot: 'bg-amber-400' },
-    critical: { label: 'Crítico', color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20', dot: 'bg-orange-500' },
-    urgent: { label: 'Urgente', color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', dot: 'bg-red-500' },
+    normal: { label: 'Normal', color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/20', dot: 'bg-emerald-500' },
+    atenção: { label: 'Atenção', color: 'text-amber-400', bg: 'bg-amber-400/10 border-amber-400/20', dot: 'bg-amber-400' },
+    urgente: { label: 'Urgente', color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20', dot: 'bg-orange-500' },
+    crítica: { label: 'Crítica', color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', dot: 'bg-red-500' },
   };
-  return configs[criticality] || configs.low;
+  return configs[criticality] || configs.normal;
 }
 
 
@@ -106,15 +106,25 @@ export function getStatusConfig(status) {
 }
 
 export function getRiskColor(score) {
-  if (score >= 75) return 'text-red-500';
-  if (score >= 50) return 'text-orange-500';
-  if (score >= 30) return 'text-amber-400';
-  return 'text-emerald-500';
+  if (score >= 85) return 'text-red-600'; // Vermelho Crítico
+  if (score >= 65) return 'text-red-500'; // Vermelho
+  if (score >= 45) return 'text-orange-500'; // Laranja
+  if (score >= 20) return 'text-amber-400'; // Amarelo
+  return 'text-emerald-500'; // Verde
 }
 
 export function getRiskBgColor(score) {
-  if (score >= 75) return 'bg-red-500';
-  if (score >= 50) return 'bg-orange-500';
-  if (score >= 30) return 'bg-amber-400';
+  if (score >= 85) return 'bg-red-600';
+  if (score >= 65) return 'bg-red-500';
+  if (score >= 45) return 'bg-orange-500';
+  if (score >= 20) return 'bg-amber-400';
   return 'bg-emerald-500';
+}
+
+export function getHealthColor(score) {
+  if (score >= 85) return 'text-emerald-500'; // Verde
+  if (score >= 65) return 'text-amber-400'; // Amarelo
+  if (score >= 45) return 'text-orange-500'; // Laranja
+  if (score >= 20) return 'text-red-500'; // Vermelho
+  return 'text-red-700'; // Vermelho Escuro (Colapso)
 }

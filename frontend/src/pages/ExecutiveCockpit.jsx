@@ -71,8 +71,8 @@ export default function ExecutiveCockpit() {
         <KPICard title="Vencendo em 30d" value={stats.expiring30} icon={Clock} variant="danger" />
         <KPICard title="Vencendo em 60d" value={stats.expiring60} icon={Clock} variant="warning" />
         <KPICard title="Vencendo em 90d" value={stats.expiring90} icon={Clock} />
-        <KPICard title="Alta Criticidade" value={stats.alta} icon={AlertTriangle} variant="danger" />
-        <KPICard title="Estratégicos" value={stats.estrategica} icon={Crosshair} variant="primary" />
+        <KPICard title="Criticidade Crítica" value={stats.critica} icon={AlertTriangle} variant="danger" />
+        <KPICard title="Urgência Contratual" value={stats.urgente} icon={Crosshair} variant="warning" />
         <KPICard title="Alertas Ativos" value={stats.activeAlerts} icon={Bell} variant="warning" />
       </div>
 
